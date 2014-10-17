@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prefs for="">
+    <bookmarks>
+        <group title="Favourites...">
+            <item title="Welcome" href="xql:files/Welcome.xql"/>
+            <item title="Files" href="collection:files" type="list"/>
+        </group>
+        <group title="Reports...">
+            <item title="Example" href="collection:files" type="report"/>
+        </group>
+    </bookmarks>
+</prefs>
