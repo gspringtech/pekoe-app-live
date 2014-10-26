@@ -70,7 +70,7 @@ For JSON see p123 of the book (pdf 146)
 module namespace prefs = "http://pekoe.io/user-prefs";
 
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
-(:import module namespace tenant = "http://pekoe.io/tenant" at "tenants.xql";:)
+import module namespace tenant = "http://pekoe.io/tenant" at "tenants.xql";
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 
 (: If you get here and there's no subdomain that's an error:)
@@ -82,17 +82,15 @@ declare
 %rest:GET
 %rest:path("/pekoe/user/bookmarks")
 %output:media-type("application/xml")
-(:%rest:produces("application/json")
-
-%output:method("json"):)
 function prefs:get-bookmarks() {
-    (:    if there's no tenant set, return an error    :)
+    (:    if there's no tenant set, return a tenant list    :)
     if (sm:has-access(xs:anyURI($prefs:tenant-path),'r--')) then prefs:bookmarks-for-user()
     else <rest:response>
             <http:response status="{$pekoe-http:HTTP-412-PRECONDITIONFAILED}">
-                <http:header name="Location" value="tenant"/>
+                <http:header name="Location" value="/exist/restxq/pekoe/tenant"/>
             </http:response>
         </rest:response>
+        
 };
 
 declare function prefs:bookmarks-for-user() {

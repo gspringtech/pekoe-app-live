@@ -12,10 +12,12 @@ declare variable $tenant:pekoe-tenants := '/db/pekoe/tenants';
 declare 
 %rest:GET
 %rest:path("/pekoe/tenant")
-%rest:produces("application/json")
-%output:media-type("application/json")
-(:%output:encoding("UTF-8"):)
-%output:method("json")
+(:
+%rest:produces("application/json"):)
+%output:media-type("application/xml")
+(:%output:media-type("application/json")
+(\:%output:encoding("UTF-8"):\)
+%output:method("json"):)
 function tenant:list() {
     <tenants for="{xmldb:get-current-user()}">{ 
     (: The advantage of simply looking at /db/pekoe/tenants is I don't need to check if the user 
