@@ -122,7 +122,8 @@ declare function odt:extract-content($uri,$col) {
     xmldb:store($col, "content.xml", zip:xml-entry($uri, "content.xml")),
 (:    xmldb:store($col,"word-links.xml",zip:xml-entry($uri, "word/_rels/document.xml.rels")),:)
     let $links := odt:get-hyperlinks($col)
-    return xmldb:store($col,"links.xml",<links>{attribute for {$links[1]/string(@for)}}{$links}</links>)
+    let $schema-for := $links[1]/tokenize(@path,'/')[2] (: want school-booking from /school-booking/path/to/field :)
+    return xmldb:store($col,"links.xml",<links>{attribute for {$schema-for}}{$links}</links>)
 };
 
 
@@ -131,6 +132,7 @@ declare function odt:get-hyperlinks($col) {
     let $tenant-link := substring-after($x, "http://pekoe.io/")   (:  bgaedu/school-booking/school/teacher?output=name  :)
     let $tenant := substring-before($tenant-link,'/') (: 'bgaedu' or 'common':)
     let $link := substring-after($tenant-link,$tenant) (: /school-booking/school/teacher?output=name :)
+    
     return <link>{attribute for {$tenant}}{attribute path {$link}}</link>
 };
 

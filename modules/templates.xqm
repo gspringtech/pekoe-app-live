@@ -37,12 +37,14 @@ The bundle will contain a /links.xml document.
 declare function templates:display-templates-list($collection as xs:string) as element()* {
     let $xColl := collection($collection)
     
-    for $childString in xmldb:get-child-collections($collection)[contains(., ".")]
+    for $childString in xmldb:get-child-resources($collection)
     let $fp := concat($collection,'/',$childString)
     let $extension := substring-after($childString,'.')
     let $title := substring-before($childString,'.')
-    let $meta-doc-path := concat($fp,'/ph-links.xml')
-    let $doctype := doc($meta-doc-path)//ph-links/@for/data(.)
+    
+    let $meta-doc-path := tm:full-meta-path($fp)
+(:    let $log := util:log("warn","GETTING TEMPLATE INFO FOR file " || $fp || " IN COLLECTION " || $collection || " META-PATH " || $meta-doc-path):)
+    let $doctype := doc($meta-doc-path || "/links.xml")/links/string(@for)
     order by $childString
     return 
         <li class='item' type='item' fileType="{$extension} {$doctype}" title="{$fp}">{$title}</li>
@@ -50,7 +52,7 @@ declare function templates:display-templates-list($collection as xs:string) as e
 
 
 declare function templates:display-collections-list($collection as xs:string) as element()* {
-    for $child in xmldb:get-child-collections($collection)[not(contains(., "."))]
+    for $child in xmldb:get-child-collections($collection)
     let $path := concat($collection, '/', $child)
     order by $child
     return
@@ -115,8 +117,10 @@ declare function templates:get-meta-file-name($file) {
 :)
 
 declare function templates:get-phlinks($template, $tenant-path) {
-    let $links := collection($template)/ph-links
-    let $doctype := $links/data(@for)
+    let $log:= util:log("warn","GET-PH-LINKS FOR " || $template)
+    let $meta-path := tm:full-meta-path($template) || "/links.xml"
+    let $links := doc($meta-path)
+    let $doctype := $links/links/data(@for)
     let $site-commands := doc($tenant-path || "/config/site-commands.xml")//commands[@for eq $doctype]
 (:    let $template-commands := $links/commands -- Just an idea.
 :)

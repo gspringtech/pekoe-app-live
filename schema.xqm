@@ -28,13 +28,13 @@ declare
 %rest:produces("application/xml")
 %output:media-type("application/xml")
 function pekoe-schema:get-schema($for) {
-    let $local-schema := collection($schema:tenant-path)/schema[@for eq $for]
+    let $local-schema := collection($pekoe-schema:tenant-path)/schema[@for eq $for]
     
     return 
         if (not(empty($local-schema)))
         then  $local-schema
         else 
-            let $default-schema := collection($schema:common)/schema[@for eq $for]
+            let $default-schema := collection($pekoe-schema:common)/schema[@for eq $for]
 (:            let $log := util:log("debug", "SCHEMA FOR " || $for || " is " || $default-schema):)
             return
                 if (not(empty($default-schema))) then $default-schema
@@ -49,9 +49,9 @@ function pekoe-schema:get-schema($for) {
 :)
 (: Probably should use the schema path to determine the 'tenant' because it could be a 'common' schema. :)
 declare 
-function pekoe-schema:make-paths($link-path, $schema) {
+function pekoe-schema:make-paths($link-path, $pekoe-schema) {
     
-    for $f in $schema/schema/(field,fragment-ref)[starts-with(@path,'/')]
+    for $f in $pekoe-schema/schema/(field,fragment-ref)[starts-with(@path,'/')]
 (:    order by $f:)
     let $path := string($f/@path)
     let $full-path := $link-path || $path

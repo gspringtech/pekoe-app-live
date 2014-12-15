@@ -43,17 +43,18 @@ declare function trigger:after-create-document($uri as xs:anyURI) {
 (: get the parent-collection path in templates-meta for a document in templates :)
 declare function tm:col-meta-path($full-doc-path) {
     let $doc-col := util:collection-name($full-doc-path)
-    let $col-debg := util:log("warn", "DOC COL IS " || $doc-col)
+(:    let $col-debg := util:log("warn", "DOC COL IS " || $doc-col):)
     return 
     (substring-before($doc-col, "/templates") || "/templates-meta" || substring-after($doc-col,"/templates"))
 };
 
-(:declare function tm:full-meta-path($full-doc-path) { (\: e.g. /db/pekoe/tenants/tdbg/templates/Programs/Wildlife-day.docx :\)
+declare function tm:full-meta-path($full-doc-path) { (: e.g. /db/pekoe/tenants/tdbg/templates/Programs/Wildlife-day.docx :)
     let $doc-name := tm:good-name(util:document-name($full-doc-path))
     let $doc-col := util:collection-name($full-doc-path)
+(:    let $log := util:log("warn", "CONSTRUCTING FULL-META-PATH docname:" || $doc-name || " doc-col:" || $doc-col || " FROM DOC:" || $full-doc-path):)
     return 
-    (substring-before($doc-col, "/templates") || "/templates-meta" || substring-after($doc-col,"/templates") || $doc-name)
-};:)
+    (substring-before($doc-col, "/templates") || "/templates-meta/" || substring-after($doc-col,"/templates") || $doc-name)
+};
 
 (: DELETE the bundle from templates-meta/
     NOTE: CAN'T USE UTIL:DOCUMENT-NAME WHEN THE DOCUMENT HAS BEEN DELETED

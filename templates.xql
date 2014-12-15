@@ -13,7 +13,7 @@ declare variable $local:common-templates-path := "/db/pekoe/common/templates";
 
 
 declare function local:list() as element() {
-    let $common-templates := tmpl:get-simple-listing($local:common-templates-path)
+    let $common-templates := () (:tmpl:get-simple-listing($local:common-templates-path):)
     let $simple-listing := tmpl:get-simple-listing($local:templates-path)
     return <ul class='hiernav'>{$common-templates,$simple-listing}</ul>
 }; 
@@ -26,6 +26,6 @@ let $requestFor := request:get-parameter("get", "list")
 return
         if ($requestFor eq "list") then  (: called by /pekoe-form/index :)
             local:list()
-        else if ($requestFor eq "phlinks") then 
+        else if ($requestFor eq "links") then 
             tmpl:get-phlinks(request:get-parameter("template",""), $local:tenant-path)
         else ()
