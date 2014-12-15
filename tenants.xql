@@ -5,6 +5,7 @@ module namespace tenant = "http://pekoe.io/tenant";
 :)
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
 
+
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare variable $tenant:pekoe-tenants := '/db/pekoe/tenants';
 
@@ -21,10 +22,12 @@ declare
 function tenant:list() {
     <tenants for="{xmldb:get-current-user()}">{ 
     (: The advantage of simply looking at /db/pekoe/tenants is I don't need to check if the user 
-        is authorized - xmldb:collection-available will do that for me. :)
+        is authorized - xmldb:collection-available will do that for me. 
+        The disadvantage is that I can't easily make a 'common' tenant.
+        I'll have to think of something else.
+        :)
     for $t in xmldb:get-child-collections($tenant:pekoe-tenants)
     let $coll := $tenant:pekoe-tenants || "/" || $t
-(:    return if (not(xmldb:collection-available($coll))) then ():)
         return if (not(sm:has-access(xs:anyURI($coll), 'r--'))) then ()
         else
     
@@ -49,6 +52,9 @@ function tenant:add($key) {
 (: Tenants file should be readable by who? Registered users? Why?
 tenants file should only be writeable by dba.  Do I need to test? 
 Do I need a tenants file?
+
+Changed /exist/restxq/pekoe/tenant/{$key}
+to /pekoe-rest/tenant/{$key}
 :)
     if (not(tenant:good-name($key))) then 
     (<rest:response>
@@ -92,6 +98,7 @@ declare function tenant:fix-ownership($collection, $staff-name) {
     sm:chown($collection,$staff-name),
     sm:chgrp($collection,$staff-name),
 (:    xmldb:set-collection-permissions($collection,$staff-name,$staff-name,sm:mode-to-octal('r-xr-x---')),:)
+(: -----------------------------------------             MUST use setGid on collections after setting the correct group-owner. :)
     for $r in xmldb:get-child-resources($collection)
     let $resource := $collection || "/" || $r
     return (sm:chown($resource,$staff-name),sm:chgrp($resource,$staff-name)),
@@ -106,6 +113,7 @@ declare function tenant:create-tenant-user($key) as xs:string { (: returns $key_
     let $tenant-staff-name := $key || "_staff"
 (:  $key_staff group will be created automatically :)
     let $tenant-owner := if (not(sm:user-exists($tenant-staff-name))) then sm:create-account($tenant-staff-name,"staffer",()) else ()
+(:    let $tenant-owner-disabled := sm:set-account-enabled($tenant-staff-name,false()):)
     
     return $tenant-staff-name
 };

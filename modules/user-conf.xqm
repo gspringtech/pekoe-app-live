@@ -69,14 +69,6 @@ declare function config:set($setting, $value) as xs:boolean {
     )
 };
 
-(:declare function config:check-user() {
-    let $user := session:get-attribute("user") 
-    let $dummy := trace($user, "USER")
-    let $u := if ($user) then $user else ""
-    let $pass := session:get-attribute("password")
-    return (xmldb:exists-user($u) and (xmldb:authenticate($config:path, $u, $pass)))
-};:)
-
 declare function config:set-default($setting, $value) as xs:boolean {
 let $dummy := util:log("debug","user-config:set-default CHECK USER")
     let $credentials := security:checkUser()
