@@ -13,7 +13,7 @@ declare variable $local:common-templates-path := "/db/pekoe/common/templates";
 
 
 declare function local:list() as element() {
-    let $common-templates := () (:tmpl:get-simple-listing($local:common-templates-path):)
+    let $common-templates := tmpl:get-simple-listing($local:common-templates-path)
     let $simple-listing := tmpl:get-simple-listing($local:templates-path)
     return <ul class='hiernav'>{$common-templates,$simple-listing}</ul>
 }; 

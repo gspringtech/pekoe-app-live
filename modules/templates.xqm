@@ -43,8 +43,9 @@ declare function templates:display-templates-list($collection as xs:string) as e
     let $title := substring-before($childString,'.')
     
     let $meta-doc-path := tm:full-meta-path($fp)
-(:    let $log := util:log("warn","GETTING TEMPLATE INFO FOR file " || $fp || " IN COLLECTION " || $collection || " META-PATH " || $meta-doc-path):)
     let $doctype := doc($meta-doc-path || "/links.xml")/links/string(@for)
+    let $log := util:log("warn","GETTING TEMPLATE INFO FOR file " || $fp || " IN COLLECTION " || $collection || " META-PATH " || $meta-doc-path || " for " || $doctype)
+    
     order by $childString
     return 
         <li class='item' type='item' fileType="{$extension} {$doctype}" title="{$fp}">{$title}</li>

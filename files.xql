@@ -94,22 +94,36 @@ declare function local:table-wrapper($path, $colName, $rows) {
   <div class='container-fluid'>
     <div class='row'>
         <div class='btn-toolbar' role='toolbar' aria-label="List controls">
+            
             {
             (: If the user is dba or is the admin user for the current tenant then show the Delete and New buttons and Rename :)
                 if ($local:user-is-admin-for-tenant) then
-            <div class='btn-group' role='group' aria-label='Other actions'>
-                <!--button id='bookmarkItem' type='button' class='btn btn-default p-needs-selection'>Bookmark</button-->
-<!--               <button id='newItem' type='button' class='btn btn-default p-needs-selection'>New</button> -->
-                <button id='unlockItem' type='button' class='btn btn-default p-needs-selection'>Unlock</button>
+            
+            <div class="dropdown btn-group">
+              <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
+                File
+                <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu  p-needs-selection" role="menu" aria-labelledby="dropdownMenu1">
+                <li role="presentation"><a class='menuitem' role='menuitem' tabidndex='-' href='#'>New</a></li>
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Rename</a></li>
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Delete</a></li>
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Unlock</a></li>
+              </ul>
+            </div>
+           (:<!-- <div class='btn-group' role='group' aria-label='Other actions'>
+                <!--button id='bookmarkItem' type='button' class='btn btn-default p-needs-selection'>Bookmark</button
+               <button id='newItem' type='button' class='btn btn-default p-needs-selection'>New</button>
+                <button id='unlockItem' type='button' class='btn btn-default'>Unlock</button>
                 <button id='deleteItem' type='button' class='btn btn-default p-needs-selection'>Delete</button>
                 <button id='renameItem' type='button' class='btn btn-default p-needs-selection'>Rename</button>
-            </div>
+            </div> --> :)
             else ()
             }
             <div class='btn-group'>
                  <form method="POST" enctype="multipart/form-data" class='form-inline'>
                     <span class="btn btn-default btn-file"><input type="file" name="fname"/></span>
-                    <button type="submit" value="upload" name="action"  class='btn btn-default'>Upload</button>                                                          
+                    <button type="submit" value="upload" name="action"  class='btn btn-default'><i class='glyphicon glyphicon-upload'></i>Upload</button>                                                          
                  </form>            
             </div>
             <div class='btn-group'>
@@ -145,11 +159,11 @@ declare function local:table-wrapper($path, $colName, $rows) {
 
                          <input type='hidden' name='collection' value='{$path}'/>
                          <input type='text' name='xpath' value='{$xpath}' id='xpath' class='form-control'/>
-                         <button type="submit" value="XPath Search" name="action"  class='btn btn-default'>XPath Search</button>
+                         <button type="submit" value="xpath" name="action"  class='btn btn-default'>XPath Search</button>
                      </form>
                  </div>
             </div>
-             </div>
+         </div>
             { ()
             (: 
             
@@ -179,6 +193,7 @@ declare function local:table-wrapper($path, $colName, $rows) {
             }
             
             <table class='table'>
+                <thead>
                 <tr>
                     <th>Name</th>
                     <th>Permissions</th>
@@ -188,16 +203,11 @@ declare function local:table-wrapper($path, $colName, $rows) {
                     <th>Modified</th>
                     <th>Size/Nodes*</th>
                 </tr>
-            
+                </thead>
+                <tbody>
             { $rows }
+            </tbody>
         </table>
-        <script type='text/javascript'> 
-        var gs;
-        // run this when loaded...
-                // console.log('apply autocmplete to ',jQuery("#xpath"));
-                // or don't
-                // jQuery("#xpath").autocomplete({{"source":"browse.xql?action=JSON", minLength:3}});
-        </script>
     </div>
     
 };
@@ -212,6 +222,7 @@ declare function local:get-ordered-items($items) {
     This is the main list query.
     Currently, it lacks SORTING and should incorporate the Text and XPath searches
 :)
+
 declare function local:display-collection() 
 {
     let $logical-path := request:get-parameter("collection",$local:base-collection)
@@ -224,7 +235,7 @@ declare function local:display-collection()
 (:    NOTE - IF  I want to display BINARY files I'll have to modify the script on line 217 ************************************  :)
     
     let $jobs := xmldb:get-child-resources($real-collection-path)[substring-after(.,".") eq 'xml']
-    let $other-docs := xmldb:get-child-resources($real-collection-path)[substring-after(.,".") ne 'xml']
+    let $other-docs := xmldb:get-child-resources($real-collection-path)[substring-after(.,".") = ('txt','docx','odt','ods','xsl')]
     let $params := "collection=" || $logical-path
     let $pagination-map := list-wrapper:pagination-map($params, ($collections,$queries,$other-docs,$jobs)) (: Count the items, work out start and end indices. :)
     let $debug := util:log('debug', 'GOT ITEMS ' || $pagination-map('items'))
@@ -264,8 +275,8 @@ declare function local:format-collection($logical-path, $real-collection-path, $
     let $permissions := sm:get-permissions(xs:anyURI($path)),
         $created := xmldb:created($path) 
     return
-    <tr class='collection' data-href='/exist/pekoe-app/files.xql?collection={$child-path}' data-title='{$child}' data-type='html' data-path='{$child-path}'>
-        <td>{$child}</td>
+    <tr class='collection' data-href='/exist/pekoe-app/files.xql?collection={$child-path}' data-title='{$child}' data-type='folder' data-path='{$child-path}'>
+        <td><i class='glyphicon glyphicon-folder-close'></i>{$child}</td>
         <td class="perm">{string($permissions/sm:permission/@mode)}</td>
         <td>{string($permissions/sm:permission/@owner)}</td>
         <td>{string($permissions/sm:permission/@group)}</td>
@@ -283,8 +294,8 @@ declare function local:format-query($logical-path, $real-collection-path, $child
         $created := xmldb:created($real-collection-path, $child),
         $modified := xmldb:last-modified($real-collection-path, $child)
     return
-    <tr class='xql' data-href='/exist/pekoe-files/{$child-path}' data-title='{$child}' data-type='html' data-path='{$child-path}'>
-        <td>{$child}</td>
+    <tr class='xql' data-href='/exist/pekoe-files/{$child-path}' data-title='{$child}' data-type='report' data-path='{$child-path}'>
+        <td><i class='glyphicon glyphicon-list'></i>{$child}</td>
         <td class="perm">{string($permissions/sm:permission/@mode)}</td>
         <td>{string($permissions/sm:permission/@owner)}</td>
         <td>{string($permissions/sm:permission/@group)}</td>
@@ -294,8 +305,10 @@ declare function local:format-query($logical-path, $real-collection-path, $child
     </tr>
 };
 
-declare function local:format-resource($logical-path, $real-collection-path, $child) {
+declare function local:format-resource($logical-path, $real-collection-path, $child as xs:string) {
+    
     let $file-path := concat($real-collection-path,"/",$child) (: This is the real path in the /db :)
+(:    let $log := util:log('warn', "FORMAT RESOURCE FOR " || $child || " at PATH " || $file-path):)
         return if (not(sm:has-access(xs:anyURI($file-path),'r'))) then ()
         else 
         let $safe-path := local:quarantined-path($file-path)
@@ -340,7 +353,7 @@ declare function local:format-resource($logical-path, $real-collection-path, $ch
                 )
                
                }
-                <td class='tablabel'>{$short-name}</td>
+                <td class='tablabel'><i class='glyphicon glyphicon-list-alt'></i>{$short-name}</td>
                 <td class="perm">{xmldb:permissions-to-string(xmldb:get-permissions($real-collection-path, $child))}</td>
                 <td>{$owner}</td>
                 <td>{xmldb:get-group($real-collection-path, $child)}</td>
@@ -397,7 +410,15 @@ declare function local:format-binary-resource($logical-path, $real-collection-pa
                 )
                
                }
-                <td class='tablabel'>{$short-name}</td>
+                <td class='tablabel'>{
+                switch ($doctype) 
+                    case "odt" return <i class='fa fa-file-code-o'></i>
+                    case "docx" return <i class='fa fa-file-word-o'></i>
+                    case "ods" return <i class='fa fa-file-code-o'></i>
+                    case "xlxs" return <i class='fa fa-file-excel-o'></i>
+                    case "txt" return <i class='fa fa-file-text-o'></i>
+                    default return <i class='fa fa-file-o'></i>
+                }{$short-name}</td>
                 <td class="perm">{xmldb:permissions-to-string(xmldb:get-permissions($real-collection-path, $child))}</td>
                 <td>{$owner}</td>
                 <td>{xmldb:get-group($real-collection-path, $child)}</td>
@@ -432,18 +453,37 @@ concat('["',string-join($results,'", "'),'"]')
     What Carolyn wants is a search that lets her double click to edit the specific meeting. 
 :)
 declare function local:xpath-search() {
-    let $col := request:get-parameter("collection", $local:base-collection)
+    let $logical-path := request:get-parameter("collection",$local:base-collection)
+    let $col := $local:tenant-path || $logical-path (: $colpath is expected to start with a slash :)
     let $search := request:get-parameter("xpath",())
-    let $callback-name := util:uuid()
     let $xpathsearch := concat("collection('",$col,"')", $search)
     
-    let $log := util:log("debug", concat("################################### XPATH Search: ",$xpathsearch) )
-    (: why not iterate over the actual results? Probably will include parent elements. :)
-    let $found  := util:eval($xpathsearch) (: get all the result nodes :)
-    let $files := (for $f in $found return root($f))/.
-    let $paging := list-wrapper:pagination-map("collection=" || $col, $files) 
-    let $response := response:set-header("Content-type","text/html")
-    return 
+    let $results  := util:eval($xpathsearch) (: get all the result nodes :)
+    let $jobs := for $f in $results return root($f)
+    let $params := "collection=" || $logical-path || "&amp;action=xpath&amp;xpath=" || $search 
+    let $pagination-map := list-wrapper:pagination-map($params, $jobs)
+    let $count := $pagination-map('items')
+(:    let $log := util:log("debug", concat("################################### XPATH Search: ",$xpathsearch, " got COUNT  ",$count) ):)
+    let $start := $pagination-map('start'),
+        $end := $pagination-map('end')
+(:    let $log := util:log("warn", "START " || $start || " END " || $end):)
+    let $resource-rows := for $c in $jobs[position() = $start to $end] order by $c return local:format-resource(util:collection-name($c), $col, util:document-name($c))
+
+(:    results required for the wrapper..:)
+     let $results := map {
+        'title' := $logical-path,
+        'path' := $logical-path,
+        'body' := local:table-wrapper($logical-path, $col, $resource-rows),
+        'pagination' := list-wrapper:pagination($pagination-map),
+        'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $logical-path)
+        }
+    return
+       list-wrapper:wrap($results)
+       
+       
+};
+
+(:let $page := 
     <div>
     <table id='{$callback-name}' class='table'>
         <tr><th>Path</th><th>Doctype</th><th>Field</th><th>Context</th></tr>
@@ -458,10 +498,10 @@ declare function local:xpath-search() {
             let $owner := xmldb:get-owner($f-col, $f-name)
             let $owner-is-me := $owner eq sm:id()//sm:username
             
-(:            Most of this is replication of code in resource-management - but it can't be imported because it uses sm:id :)
+(\:            Most of this is replication of code in resource-management - but it can't be imported because it uses sm:id :\)
             let $smp := sm:get-permissions(xs:anyURI($file-path))
             let $read-permissions := $smp//@mode = ($local:closed-and-available, $local:xquery-permissions)
-            let $locked-class :=  (:if (not($read-permissions)) then "locked" else ():)
+            let $locked-class :=  (\:if (not($read-permissions)) then "locked" else ():\)
                 if ($read-permissions) then $file-type
                 else if ($owner-is-me) then concat($file-type, " locked-by-me") 
                 else " locked"
@@ -481,9 +521,8 @@ declare function local:xpath-search() {
             </tr>
         }
     </table>
+    </div>:)
     
-    </div>
-};
 
 declare function local:display-search-results() {
     let $path := request:get-parameter("collection",$local:base-collection)
@@ -656,19 +695,22 @@ declare function local:do-delete() {
 };
 
 declare function local:unlock-file() {
-    let $path := request:get-parameter("path","")
+    let $path := request:get-parameter("path","") (: /files/schemas/trimmed-txo-schema.xml :)
     return if ($path eq "" ) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
     else
-        let $real-path := $local:tenant-path || $path
-        let $uri := xs:anyURI($path)
-        let $parent := util:collection-name($path)
+        let $real-path := $local:tenant-path || $path 
+        let $uri := xs:anyURI($real-path)
+(:        let $log := util:log("warn", "URI: " || request:get-uri()      || " VS URL: " || request:get-url()):)
+(:                                      URI:      /exist/pekoe-app/files.xql  VS URL:      http://owl.local/exist/pekoe-app/files.xql:)
+        let $parent := util:collection-name($real-path)
         let $quarantined := local:quarantined-path($parent)
         let $collection-permissions := sm:get-permissions(xs:anyURI($parent))
+        let $group-owner := $collection-permissions/sm:permission/data(@group)
         return 
-            if (not(doc-available($path))) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
+            if (not(doc-available($real-path))) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
             else (
-            util:exclusive-lock(doc($path), (sm:chown($uri, $collection-permissions/sm:permission/@group), sm:chmod($uri, "r--r-----"))),
-            (response:set-status-code(205),response:set-header("Location", request:get-uri()))
+            util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "r--r-----"))),
+            (response:set-status-code(205),response:set-header("Location", request:get-uri() || "?collection=" || $quarantined ))
             )
 };
 

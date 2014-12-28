@@ -108,9 +108,9 @@ declare function tenant:fix-ownership($collection, $staff-name) {
 };
 
 declare function tenant:create-tenant-user($key) as xs:string { (: returns $key_staff :)
-    let $admin-group-name := $key || "_admin"
+    let $admin-group-name := "admin_" || $key 
     let $admin-users := if (not(sm:group-exists($admin-group-name))) then sm:create-group($admin-group-name, "Admin users for " || $key) else ()
-    let $tenant-staff-name := $key || "_staff"
+    let $tenant-staff-name := "staff_" || $key
 (:  $key_staff group will be created automatically :)
     let $tenant-owner := if (not(sm:user-exists($tenant-staff-name))) then sm:create-account($tenant-staff-name,"staffer",()) else ()
 (:    let $tenant-owner-disabled := sm:set-account-enabled($tenant-staff-name,false()):)

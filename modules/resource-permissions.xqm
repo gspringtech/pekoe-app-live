@@ -10,7 +10,7 @@ declare function resource-permissions:permissions($href) {
     let $collection-permissions := sm:get-permissions(xs:anyURI($parent))
     
 
-    let $current-user := sm:id()//sm:real/sm:username/text()
+    let $current-user :=  "barry" (:sm:id()//sm:real/sm:username/text():)
     let $permissions := map { 
         "collection" := util:collection-name($href),
         "docname" := util:document-name($href),
@@ -20,5 +20,6 @@ declare function resource-permissions:permissions($href) {
         "mode" := string($permissions//@mode),
         "user" := $current-user
     }
+    let $log := util:log("debug", 'PERMISSIONS ' || $permissions("user"))
     return $permissions      
 };

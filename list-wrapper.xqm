@@ -25,9 +25,10 @@ declare option output:media-type "text/html";
 
 declare function list-wrapper:breadcrumbs($base, $path) {
     let $path-parts := tokenize(substring-after($path,'/'),'/')
+    let $last := count($path-parts)
     for $part at $i in $path-parts
     let $link := string-join($path-parts[position() le $i],'/')
-    return <li><a href='{$base}/{$link}'>{$part}</a></li>
+    return <li>{if ($i eq $last) then $part else <a href='{$base}/{$link}'>{$part}</a>}</li>
 };
 
 declare function list-wrapper:pagination($pagination-map) {
@@ -118,24 +119,21 @@ declare function list-wrapper:wrap($content) {
 </head>
 <body>
     <div class='btn-toolbar' role='toolbar' aria-label="List controls">
-        <div class='btn-group' role='group' aria-label='Open actions'>
-            <button id='openItem' type='button' class='btn btn-default p-needs-selection'>Open</button>
-            <button id='openItemTab' type='button' class='btn btn-default p-needs-selection'>Open in <em>new tab</em></button>
-        </div>
-        
         <div class='btn-group' role='group' aria-label='Breadcrumbs'>
             <ol class='breadcrumb'>{$content('breadcrumbs')}</ol>
         </div>
-        <div class='btn-group' role='group' aria-label=''>
-            <button id='refresh' type='button' class='btn btn-default'>Refresh</button>    
+        
+        <div class='pull-right' role='group' aria-label='Open actions'>
+            <button id='openItem' type='button' class='btn p-needs-selection'><i class='glyphicon glyphicon-folder-open'></i>Open</button>
+            <button id='openItemTab' type='button' class='btn p-needs-selection'><i class='glyphicon glyphicon-share-alt'></i>Open in new tab</button> 
+            <button id='refresh' type='button' class='btn'><i class='glyphicon glyphicon-refresh'></i>Refresh</button>  
         </div>
-        <div class='btn-group' role='group' aria-label=''>
-            {$content('pagination')}
-        </div>
+        
     </div>
 
 <div class='table-responsive'>
 {$content('body')}
+{$content('pagination')}
 </div>
 </body>
 </html>

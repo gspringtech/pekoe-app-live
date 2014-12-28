@@ -4,27 +4,64 @@ xquery version "3.0";
 There are some basic advantages in using JSON - it's simply much easier to integrate with a Javascript front end like Angular.
 However, the disadvantages are becoming more apparent.
 1/ Can't easily edit a user-file or the default.
-2/ Can't run a script to modify all of them (without jumping through serious hoops)
+2/ Can't run a script to modify all of them (here on the server) without jumping parsing the json
 3/ Can't easily include "default" items into the Bookmarks. (e.g. Files, Welcome, or Admin functions.)
 
+I guess a simple rule might be that JSON is good if there's no round-trip involved.
 
-For JSON see p123 of the book (pdf 146)
-<container json:array="true"><thing>a</thing></container>
-[{thing : 'a'}]
+This conversion process possibly could be replaced by custom stylesheet. But even
+better would be a Json Proxy wrapped around the XML. I'm looking forward to trying that.
+I suspct it will still be a custom solution, but it could be simpler and 
+better able to cope with changes to the Bookmark spec.
 
-    see http://expath.org/spec/http-client for info on http:response
-    
-    <http:response status = integer
-                  message = string>
-   (http:header*,
-     (http:multipart |
-      http:body)?)
-</http:response>                                                                                                                                                                                                                                                                                                                                                                                                                             
-    
-    
+So  - I've chosen to send and receive XML. The conversion functions are specific and quite simple.
+I could probably improve the code.
+
+        // this is more reliable than serialising xml as json, or using x2js or similar.
+        function convertBookmarksFromXML(x) { // x is an Angular Object containing a Document
+            var newBookmarks = {groups:[],dirty: false};
+            x.find('group').each(function(){
+                var g = $(this);
+                var group = {title: g.children('title').text(), items:[] };
+                newBookmarks.groups.push(group);
+                g.find('item').each(function () {
+                    var i = $(this);
+                    group.items.push({
+                        title:  i.find('title').text(),
+                        href:   i.find('href').text(),
+                        type:   i.find('type').text(),
+                        active: i.find('active').text() === 'true'
+                    });
+                });
+            });
+            return newBookmarks;
+        }
+        
+        function newEl(od,n,t) {
+            var el = od.createElement(n);
+            el.textContent = t;
+            return el;
+        }
+        
+        function convertBookmarksToXML(){
+            var od = (new DOMParser()).parseFromString('<pref for="bookmarks"></pref>', 'text/xml');
+            var doc = od.documentElement;
+            myBookmarks.groups.forEach(function(e) {
+                var g = od.createElement("group");
+                var t = od.createElement("title");
+                t.textContent = e.title;
+                g.appendChild(t);
+                e.items.forEach(function (el) {
+                    var item = od.createElement('item');
+                    item.appendChild(newEl(od,'title',el.title));
+                });
+                doc.appendChild(g);
+            });
+        }
+        
 :)
 
-module namespace prefs = "http://pekoe.io/user-prefs";
+declare namespace prefs = "http://pekoe.io/user-prefs";
 
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
 
@@ -37,35 +74,34 @@ declare variable $prefs:selected-tenant := req:header("tenant");
 declare variable $prefs:tenant-path := "/db/pekoe/tenants/" || $prefs:selected-tenant ;
 declare variable $prefs:config-collection-name := $prefs:tenant-path || "/config/users";
 declare variable $prefs:user := sm:id()//sm:real/sm:username/text();
+declare variable $prefs:admin-group := "admin_" || $prefs:selected-tenant;
+declare variable $prefs:user-is-admin := sm:is-dba($prefs:user) or sm:id()//sm:real//sm:group = $prefs:admin-group;
 declare variable $prefs:default-prefs := collection( $prefs:config-collection-name )/config[@for eq 'default'];
 declare variable $prefs:user-prefs := collection( $prefs:config-collection-name )/config[@for eq $prefs:user];
+declare variable $prefs:admin-prefs :=  collection($prefs:config-collection-name )/config[@for eq "admin_" || $prefs:selected-tenant ];
 
+(: RESTXQ doesn't provide mch help with errors. I had accidently created two functiions with the same name and arity. :)
 
 declare 
 %rest:GET
 %rest:path("/pekoe/user/bookmarks")
-%rest:produces("application/json")
-%output:media-type("application/json")
-(:%output:method("json"):)
-function prefs:get-bookmarks-json() {
-(:util:log('warn','CURRENT TENANT PATH IS ' || $prefs:tenant-path),:)
-    if (sm:has-access(xs:anyURI($prefs:tenant-path),'r--')) then prefs:get-pref("bookmarks")/text()
+function prefs:get-bookmarks-que() {
+try {
+    if (sm:has-access(xs:anyURI($prefs:tenant-path),'r--')) then prefs:get-bookmarks()
     else <rest:response>
             <http:response status="{$pekoe-http:HTTP-412-PRECONDITIONFAILED}">
                 <http:header name="Location" value="/exist/restxq/pekoe/tenant"/>
             </http:response>
-        </rest:response>
-        
+        </rest:response>        
+        } catch * { util:log("debug", $err:description) }
 };
 
 declare 
 %rest:POST("{$body}")
 %rest:path("/pekoe/user/bookmarks")
-%rest:consumes("application/json")
-%output:media-type("application/json")
-(:%output:method("json"):)
-function prefs:store-bookmarks-json($body) {
-    prefs:set-pref("bookmarks", util:base64-decode($body))
+%rest:consumes("text/xml")
+function prefs:store-bookmarks($body) {
+    prefs:set-pref("bookmarks", $body)
 
 };
 
@@ -80,9 +116,49 @@ declare function prefs:get-doc-content($docname) {
     return doc($fullpath)/config
 };
 
-declare function prefs:get-pref($for) {
+(:These are not prefs - these are bookmarks 
+    Consider having a read-only "group" which belongs to 
+    admin_tdbg
+    config for=admin_tdbg
+    <pref for = bookmarks>
+        templates
+        schemas
+        ?
+        
+    Also note - BKFA need 3 levels - they need a general user and a restricted user 
+    plus an admin
+    
+    So the 
+:)
+(:declare function prefs:add-admin-prefs($base-prefs) {
+()
+};
+
+declare function prefs:get-bookmarks() {
+
     let $log := util:log("warn", "GET config FOR USER " || $prefs:user || " FROM TENANT COLLECTION " || $prefs:config-collection-name)
-(:    let $log := util:log("warn", $prefs:user-prefs):)
+    let $pref := $prefs:user-prefs/pref[@for eq $for]
+    let $user-prefs :=
+        if (exists($pref)) then $pref
+        else $prefs:default-prefs/pref[@for eq $for]
+    return if (sm:is-dba(xmldb:get-current-user())) then 
+        prefs:add-admin-prefs($user-prefs)
+        else $user-prefs
+};:)
+
+declare function prefs:get-bookmarks() {
+(:    prefs:get-pref('bookmarks'):)
+    
+    let $log := util:log('warn',sm:id())
+    let $user-bookmarks := prefs:get-pref('bookmarks')
+    
+    let $admin-bookmarks := if ($prefs:user-is-admin) then $prefs:admin-prefs/pref[@for eq 'bookmarks'] else ()
+    let $log := util:log("debug", 'USE ADMIN BOOKMARKS >>>>>>>>>>>>>> ?' || $prefs:user-is-admin)
+    let $log1 := util:log('debug', $admin-bookmarks)
+    return <pref for='bookmarks'>{($user-bookmarks,$admin-bookmarks)/group}</pref>
+};
+
+declare function prefs:get-pref($for) {
     let $pref := $prefs:user-prefs/pref[@for eq $for]
     return 
         if (exists($pref)) then $pref
@@ -95,7 +171,8 @@ declare function prefs:good-name($u) {
 };
 
 declare function prefs:set-pref($for, $pref-item) {
-    let $good-pref := if (($pref-item instance of element()) and name($pref-item) eq "pref") then $pref-item else 
+(:    let $log := util:log("warn", "PREFS NAME IS " || name($pref-item/*) || " is document? " || $pref-item instance of document-node()):)
+    let $good-pref := if (($pref-item instance of document-node()) and name($pref-item/*) eq "pref") then $pref-item/* else 
         <pref for='{$for}'>{$pref-item}</pref>
         
     let $docname := concat(prefs:good-name($prefs:user), ".xml")
@@ -107,3 +184,4 @@ declare function prefs:set-pref($for, $pref-item) {
     return ()
 };
 
+()

@@ -15,6 +15,7 @@ declare namespace trigger = "http://exist-db.org/xquery/trigger";
 import module namespace ods="http://www.gspring.com.au/pekoe/templates/ods" at "ods.xqm";
 import module namespace odt="http://www.gspring.com.au/pekoe/merge/odt" at "merge-odt.xqm";
 import module namespace docx="http://www.gspring.com.au/pekoe/merge/docx" at "merge-docx.xqm";
+import module namespace ptxt="http://www.gspring.com.au/pekoe/merge/txt" at "merge-txt.xqm";
 import module namespace phtml="http://www.gspring.com.au/pekoe/templates/pekoe-html" at "phtml.xqm";
 
 declare variable $tm:log-level external;
@@ -51,9 +52,9 @@ declare function tm:col-meta-path($full-doc-path) {
 declare function tm:full-meta-path($full-doc-path) { (: e.g. /db/pekoe/tenants/tdbg/templates/Programs/Wildlife-day.docx :)
     let $doc-name := tm:good-name(util:document-name($full-doc-path))
     let $doc-col := util:collection-name($full-doc-path)
-(:    let $log := util:log("warn", "CONSTRUCTING FULL-META-PATH docname:" || $doc-name || " doc-col:" || $doc-col || " FROM DOC:" || $full-doc-path):)
+    let $log := util:log("warn", "CONSTRUCTING FULL-META-PATH docname:" || $doc-name || " doc-col:" || $doc-col || " FROM DOC:" || $full-doc-path)
     return 
-    (substring-before($doc-col, "/templates") || "/templates-meta/" || substring-after($doc-col,"/templates") || $doc-name)
+    (substring-before($doc-col, "/templates") || "/templates-meta/" || substring-after($doc-col,"/templates") || "/" ||  $doc-name)
 };
 
 (: DELETE the bundle from templates-meta/
@@ -156,7 +157,7 @@ declare function tm:extract-and-store-content-from($uri,$col) {
         case "odt" return odt:extract-content($uri,$col)
  (:        case "ods" return zip:xml-entry($uri, "content.xml")
         :)
-        case "txt" return xmldb:store($col, "content.xml",<content>{util:binary-doc(xs:string($uri))}</content>)
+        case "txt" return ptxt:extract-content($uri,$col)
         default return <unknown-doctype>{$doctype}</unknown-doctype>
     return $uri
 };
