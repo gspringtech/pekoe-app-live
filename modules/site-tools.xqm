@@ -145,7 +145,7 @@ let $message :=
 </mail>
 return 
    if ( mail:send-email($message, (),())) then
-   (system:as-user("admin", "4LafR1W2", (update value $job//status with "Complete", update value $email/@sent with '1') ),
+   (system:as-user("admin", "XXXXXX", (update value $job//status with "Complete", update value $email/@sent with '1') ),
    <result status='okay'>Sent!</result> 
    )
    else <result status='fail'>Message NOT sent</result>
@@ -219,7 +219,7 @@ let $send :=  mail:send-email(xs:long($session), $message)
 
 return 
     (
-        system:as-user("admin", "4LafR1W2", update replace $job//status with <status date-stamp="{current-date()}">Completed</status>),
+        system:as-user("admin", "XXXXXX", update replace $job//status with <status date-stamp="{current-date()}">Completed</status>),
         <result status='okay'>Sent!</result> 
         )
    

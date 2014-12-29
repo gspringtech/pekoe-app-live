@@ -104,7 +104,7 @@ declare function sn:really-unlock-file($href,$doc) {
     let $log := util:log("debug",concat("REALLY UNLOCK: IS valid user?: ",$valid-user,", and group is ",$group)) 
 
     return if ($valid-user) (: and $current-permissions eq $sn:open-for-editing)  -- this doesn't seem useful. :) 
-        then system:as-user("admin", "4LafR1W2", 
+        then system:as-user("admin", "XXXXXX", 
             xmldb:set-resource-permissions(
                 $pathParts[1],
                 $pathParts[2],

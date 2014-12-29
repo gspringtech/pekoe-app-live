@@ -3,7 +3,7 @@ import module namespace sn="http://gspring.com.au/pekoe/serial-numbers" at "seri
 import module namespace prefs="http://gspring.com.au/pekoe/user-prefs" at "ui-prefs.xqm";
 
 
-declare variable $pqt:admin-pass := "4LafR1W2"; (: TODO replace with setUid script :)
+declare variable $pqt:admin-pass := "XXXXXX"; (: TODO replace with setUid script :)
 
 declare function pqt:ancestry($n as node()) {
     for $p in $n/ancestor-or-self::* return (name($p))
