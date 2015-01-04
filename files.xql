@@ -1,40 +1,17 @@
 xquery version "3.0";
 (: 
     Top-level List View: browse files, xqueries and collections.
-    This file has setUid applied. It will run as admin.
-    THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN.
+    NOTE: Capture and Release are performed by the Controller forwarding to modules/resource-managment.xql
 :)
-
-(:
-    Need to rethink this - XQuery/XPath 3 is composable and has higher-order functions. 
-    
-    And here's another think to think about.
-    Because the 'list' is NOT XHR, I can't perform those simple XHR actions like
-    create, delete, move 
-    without a page-refresh and redirect after post.
-    
-    Unless somehow I use the XHR and refresh
-    Instead of POST and redirect, use XHR and refresh.
-    
-    Or even, XHR and then go to the location returned
-    $.post(files.xql, data, function(response) { if (response.href) location.href = response.href; })
-:)
-
-
-(:declare namespace browse = "http://www.gspring.com.au/file-browser";:)
 
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
+
 declare option output:method "html5";
 declare option output:media-type "text/html";
 
-(:import module namespace permissions = "http://www.gspring.com.au/pekoe/admin-interface/permissions"  at "admin/permissions.xqm";:)
+import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
 import module namespace list-wrapper = "http://pekoe.io/list/wrapper" at "list-wrapper.xqm";
 
-declare variable $local:default-pass := "staffer";
-declare variable $local:open-for-editing :=       "rwxr-----";
-declare variable $local:closed-and-available :=   "r--r-----"; 
-declare variable $local:xquery-permissions :=     "rwxr-x---";
-declare variable $local:collection-permissions := "rwxrwx---";
 
 declare variable $local:root-collection := "/db/pekoe";
 declare variable $local:base-collection := "/files";
@@ -43,8 +20,8 @@ declare variable $local:action := request:get-parameter("action","browse");
 declare variable $local:tenant := replace(request:get-cookie-value("tenant"),"%22","");
 declare variable $local:tenant-path := "/db/pekoe/tenants/" || $local:tenant;
 declare variable $local:current-user := sm:id()//sm:real;
-declare variable $local:tenant-admin-group := "admin_" || $local:tenant;
-declare variable $local:user-is-admin-for-tenant := local:user-is-admin-for-tenant();
+declare variable $local:tenant-admin-group := "pekoe-tenant-admins";
+declare variable $local:user-is-admin-for-tenant := local:user-is-admin(); 
 
 
 
@@ -82,10 +59,20 @@ declare function local:quarantined-path($real-path) {
     substring-after($real-path, $local:tenant-path)
 };
 
-declare function local:user-is-admin-for-tenant() {
-sm:is-dba($local:current-user/sm:username) or sm:get-user-groups($local:current-user/sm:username) = $local:tenant-admin-group
+(: Why not use a generic "pekoe-admin" group. I'm not showing these people something different, and the pekoe-admin group won't be a login or have ownership. 
+:)
+declare function local:user-is-admin() {
+    sm:is-dba($local:current-user/sm:username) or sm:get-user-groups($local:current-user/sm:username) = $local:tenant-admin-group
 
 };
+
+(: NOTE: The menu items and other actions that appear here need to be fairly self-contained. Probably running them as form-actions is best.
+    The menu-items can't easily be wrapped in a FORM, and some will need parameters (and a selection).
+    So the list-wrapper.js should have a means of dealing generically with these things.
+    
+    I had always wanted this to be an XHR list - using some of the clever collection-management features 
+    but the complexity of rendering the content makes that too hard.
+:)
 
 declare function local:table-wrapper($path, $colName, $rows) {
     let $searchstr := request:get-parameter("searchstr", ())
@@ -105,29 +92,22 @@ declare function local:table-wrapper($path, $colName, $rows) {
                 <span class="caret"></span>
               </button>
               <ul class="dropdown-menu  p-needs-selection" role="menu" aria-labelledby="dropdownMenu1">
-                <li role="presentation"><a class='menuitem' role='menuitem' tabidndex='-' href='#'>New</a></li>
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Rename</a></li>
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Delete</a></li>
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="#">Unlock</a></li>
+                <!--li role="presentation"><a class='menuitem' role='menuitem' tabidndex='-' href='/exist/pekoe-app/manage-files.xql'>New</a></li-->
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='rename' data-params='name'>Rename</a></li>
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='delete' data-confirm='yes'>Delete</a></li>
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Close</a></li>
               </ul>
             </div>
-           (:<!-- <div class='btn-group' role='group' aria-label='Other actions'>
-                <!--button id='bookmarkItem' type='button' class='btn btn-default p-needs-selection'>Bookmark</button
-               <button id='newItem' type='button' class='btn btn-default p-needs-selection'>New</button>
-                <button id='unlockItem' type='button' class='btn btn-default'>Unlock</button>
-                <button id='deleteItem' type='button' class='btn btn-default p-needs-selection'>Delete</button>
-                <button id='renameItem' type='button' class='btn btn-default p-needs-selection'>Rename</button>
-            </div> --> :)
             else ()
             }
             <div class='btn-group'>
-                 <form method="POST" enctype="multipart/form-data" class='form-inline'>
+                 <form action='/exist/pekoe-app/manage-files.xql' method="POST" enctype="multipart/form-data" class='form-inline'>
                     <span class="btn btn-default btn-file"><input type="file" name="fname"/></span>
                     <button type="submit" value="upload" name="action"  class='btn btn-default'><i class='glyphicon glyphicon-upload'></i>Upload</button>                                                          
                  </form>            
             </div>
             <div class='btn-group'>
-                 <form method="GET" class='form-inline'><input type='hidden' name='collection' value='{$path}' />
+                 <form action='/exist/pekoe-app/manage-files.xql' method="GET" class='form-inline'><input type='hidden' name='collection' value='{$path}' />
                       
                     <select name='doctype' id='doctype' class='form-control'>   
                         <option disabled='disabled' selected='selected'>make new item...</option>   
@@ -325,7 +305,7 @@ declare function local:format-resource($logical-path, $real-collection-path, $ch
         let $current-user := string($local:current-user/sm:username)
         let $owner-is-me := $owner eq $current-user
 
-        let $permission-to-open := $smp//@mode eq $local:closed-and-available
+        let $permission-to-open := $smp//@mode eq $resource-permissions:closed-and-available
 
     
         let $short-name := substring-before($child, ".")
@@ -449,9 +429,6 @@ concat('["',string-join($results,'", "'),'"]')
 };
 
 
-(: the problem with this search at the moment is that it returns a file without showing where the result is.
-    What Carolyn wants is a search that lets her double click to edit the specific meeting. 
-:)
 declare function local:xpath-search() {
     let $logical-path := request:get-parameter("collection",$local:base-collection)
     let $col := $local:tenant-path || $logical-path (: $colpath is expected to start with a slash :)
@@ -482,46 +459,6 @@ declare function local:xpath-search() {
        
        
 };
-
-(:let $page := 
-    <div>
-    <table id='{$callback-name}' class='table'>
-        <tr><th>Path</th><th>Doctype</th><th>Field</th><th>Context</th></tr>
-        {
-            for $f in $files[position() = $paging('start') to $paging('end')]
-            let $f-col := util:collection-name($f)
-            let $f-name := util:document-name($f)
-            let $file-path := document-uri($f)
-            
-            let $file-type := "xml"
-            
-            let $owner := xmldb:get-owner($f-col, $f-name)
-            let $owner-is-me := $owner eq sm:id()//sm:username
-            
-(\:            Most of this is replication of code in resource-management - but it can't be imported because it uses sm:id :\)
-            let $smp := sm:get-permissions(xs:anyURI($file-path))
-            let $read-permissions := $smp//@mode = ($local:closed-and-available, $local:xquery-permissions)
-            let $locked-class :=  (\:if (not($read-permissions)) then "locked" else ():\)
-                if ($read-permissions) then $file-type
-                else if ($owner-is-me) then concat($file-type, " locked-by-me") 
-                else " locked"
-        
-            let $short-name := substring-before($f-name,'.')
-            let $available := if (util:is-binary-doc($file-path)) then util:binary-doc-available($file-path) else doc-available($file-path)
-            let $doctype := if ($available and ($file-type eq "xml"))
-                then name($f/*)
-                else $file-type
-            let $title := if ($read-permissions or $owner-is-me) then concat($doctype,":", $file-path) else $owner
-            return if (not($available)) then () else
-            <tr title='{$title}' class='{string-join(($locked-class,$doctype)," ")}'>
-                <td class='tablabel'>{document-uri($f)}</td>
-                <td>{name($f/*)}</td>
-                <td>--</td>
-                <td>--</td>
-            </tr>
-        }
-    </table>
-    </div>:)
     
 
 declare function local:display-search-results() {
@@ -571,7 +508,7 @@ declare function local:display-search-results() {
             let $owner-is-me := $owner eq sm:id()//sm:username
             
             let $smp := sm:get-permissions(xs:anyURI($file-path))
-            let $read-permissions := $smp//@mode = ($local:closed-and-available, $local:xquery-permissions)
+            let $read-permissions := $smp//@mode = ($resource-permissions:closed-and-available, $resource-permissions:xquery-permissions)
             let $locked-class :=  (:if (not($read-permissions)) then "locked" else ():)
                 if ($read-permissions) then $file-type
                 else if ($owner-is-me) then concat($file-type, " locked-by-me") 
@@ -599,173 +536,18 @@ declare function local:display-search-results() {
     </div>
 };
 
-(:
-    Get the name of the parent collection from a specified collection path.
-:)
-declare function local:get-parent-collection($path as xs:string) as xs:string {
-    if($path eq "/db") then
-        $path
-    else
-        replace($path, "/[^/]*$", "")
-};
-
-(: ***************************************     FILE UPLOAD ***********************************  :)
-declare function local:file-upload() {
-    let $safe-collection := request:get-parameter("collection", ())
-    let $collection := $local:tenant-path || $safe-collection
-    let $name := request:get-uploaded-file-name("fname")
-    let $file := request:get-uploaded-file-data("fname")
-    let $log := util:log("debug", "GOING TO STORE " || $name || " INTO COLLECTION " || $collection)
-    let $stored := xmldb:store($collection, xmldb:encode-uri($name), $file)
-    return response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection))
-};
 
 
-(:  This is nice, but doesn't add an ID and allows creation of fragment-elements (like "item" which is a child of ca-resources) :)
-declare function local:new-file($doctype, $colname,$file-name, $group-user) {
-    let $new-file := element {$doctype} {
-    attribute created-dateTime {current-dateTime()},
-    attribute created-by {$local:current-user/sm:username/text()}
-        
-        }
-    let $new := xmldb:store($colname, $file-name, $new-file)
-    let $uri := xs:anyURI($new)
-    let $chown := sm:chown($uri, $group-user)
-    let $chgrp := sm:chgrp($uri,$group-user)
-    let $chmod := sm:chmod($uri,'r--r-----')
-    return $new 
-};
-
-declare function local:good-file-name($n,$type) {
-    if ($type ne 'collection') 
-    then concat(replace(tokenize($n,"\.")[1],"[\W]+","-"), ".xml")
-    else replace(tokenize($n,"\.")[1],"[\W]+","-")
-};
-
-(:
-    So for functions inside /db/apps/pekoe - which are common for all tenants - it might be 
-    useful to setUid as admin (or another specific dba user) on those scripts
-    so that the script can execute system:as-user(group-user, standard-password, code-block)
-    Then, any resources will be owned by the group-user.
-    setGid will ensure that all collections and resources in a tenancy will belong to the group-user.
-
-:)
-
-(: Such good code. I have just accidently deleted my test /files directory.  20141213.
-    
-    Can I do a backup prior to deletion?
-    Only admin can do a backup. 
-    Option 1: set this file as admin setUid (bad idea)
-    Option 2: use compression to backup the directory instead
-    Option 3: use a pipeline in the controller to handle this 
-    Option 4: send delete to a different xql with setUid
-    
-    Problem with setUid is that it will override the permissions that should be checked prior to a deletion.
-    
-    AND this file ALREADY has setUID - which is possibly why my files were trashed.
-    
-    Why do I have setUid enabled on this file?
-    
-    :)
-declare function local:do-delete() {
-    let $path := request:get-parameter("path","")
-    return if ($path eq $local:base-collection) then (response:set-status-code(304),response:set-header("Location", request:get-url()))
-    else
-    let $real-path := $local:tenant-path || $path
-    let $export := system:export-silently($real-path, false(),true())
-    let $parent-collection := util:collection-name($real-path)
-    let $quarantined := local:quarantined-path($parent-collection)
-    let $delete-log:= if (xmldb:collection-available($real-path)) 
-                    then util:log("warn", "GOING TO DELETE COLLECTION (real-path)" || $real-path || " (path)" || $path )
-                    else util:log("warn", "GOING TO DELETE " || util:document-name($real-path) || " FROM COLLECTION " || $parent-collection )
-    let $delete:= if (xmldb:collection-available($real-path)) 
-                    then xmldb:remove($real-path)
-                    else xmldb:remove($parent-collection, util:document-name($real-path))
-                    
-    return (response:set-status-code(205),response:set-header("Location", request:get-url() || "?collection=" || $quarantined))
-   (: let $resource := util:document-name($path)
-    let $collection := util:collection-name($path)
-    let $log := util:log("DELETE " || $resource || " FROM " || $collection)
-    
-    let $delete := ():)
-(:        if (empty($resource))  (\: must be a collection. BE VERY CAREFUL. $collection is the PARENT!!! I inadvertently removed ALL /db/pekoe/files !!! :\)
-        then xmldb:remove($local:path)
-        else xmldb:remove($collection,$resource):)
-    
-};
-
-declare function local:unlock-file() {
-    let $path := request:get-parameter("path","") (: /files/schemas/trimmed-txo-schema.xml :)
-    return if ($path eq "" ) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
-    else
-        let $real-path := $local:tenant-path || $path 
-        let $uri := xs:anyURI($real-path)
-(:        let $log := util:log("warn", "URI: " || request:get-uri()      || " VS URL: " || request:get-url()):)
-(:                                      URI:      /exist/pekoe-app/files.xql  VS URL:      http://owl.local/exist/pekoe-app/files.xql:)
-        let $parent := util:collection-name($real-path)
-        let $quarantined := local:quarantined-path($parent)
-        let $collection-permissions := sm:get-permissions(xs:anyURI($parent))
-        let $group-owner := $collection-permissions/sm:permission/data(@group)
-        return 
-            if (not(doc-available($real-path))) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
-            else (
-            util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "r--r-----"))),
-            (response:set-status-code(205),response:set-header("Location", request:get-uri() || "?collection=" || $quarantined ))
-            )
-};
-
-
-declare function local:do-new() {
-    let $path := request:get-parameter("collection",$local:base-collection)
-    let $full-path := $local:tenant-path || $path
-    let $log := util:log("warn","FULL PATH IS " || $full-path)
-    let $item-type := request:get-parameter("doctype","") 
-    let $group-user := sm:get-permissions(xs:anyURI($full-path))//@group/string()   
-    let $file-name := local:good-file-name(request:get-parameter("file-name",""),$item-type)
-    let $debug := util:log('debug', 'GOING TO CREATE ' || $full-path || ' / ' || $file-name)
-(:    NOTE: must find a way to redirect after this. Perhaps this should be a POST anyway - as we are 
-creating a resource. The automatic RELOAD is causing this action to run again. :)
-    (:let $redirect-path := response:set-header("RESET_PARAMS","action=browse"):) (:The header MUST have a value or it won't be received by the client:)
-    return 
-        if ($item-type eq "" or $file-name eq "") then local:display-collection()
-        else 
-        let $result :=  
-            if ($item-type eq "collection")            
-            then (
-            let $new := xmldb:create-collection($full-path,$file-name)
-            let $uri := xs:anyURI($new)
-            let $chown := sm:chown($uri, $group-user)
-            let $chgrp := sm:chgrp($uri, $group-user)
-            let $chmod := sm:chmod($uri,'rwxrwx---')
-            return $new 
-            (: TODO fix permissions and ownership :)
-            )
-            else local:new-file($item-type,$full-path,$file-name, $group-user)
-(:            https://owl.local/exist/rest/db/apps/pekoe/files.xql?collection=%2Ffiles&doctype=todo&file-name=test&action=New
-:)
-        return response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $path))
-};
-
-declare function local:title($path-parts) {
-    let $t := $path-parts[position() eq last()]
-    return concat(upper-case(substring($t,1,1)), substring($t,2))
-};
 
 (: ************************** MAIN QUERY *********************** :)
 
-        
-(:        try {:)
     (: browse is the default action :)
          if ($local:action eq "browse") then local:display-collection()
     else if ($local:action eq "Search") then local:display-search-results()
     else if ($local:action eq "xpath")  then local:xpath-search()
     else if ($local:action eq "JSON")   then local:json-xpath-lookup()
     
-    else if ($local:action eq "unlock") then local:unlock-file()
-    else if ($local:action eq "upload") then local:file-upload()
-    else if ($local:action eq "create")    then local:do-new()
-    else if ($local:action eq "delete") then local:do-delete()
+
     else <result status='error'>Unknown action {$local:action} </result>
     
-(:    } catch * { "CAUGHT ERROR " || $err:code || ": " || $err:description || " " || $local:action }:)
             

@@ -124,9 +124,9 @@ declare function list-wrapper:wrap($content) {
         </div>
         
         <div class='pull-right' role='group' aria-label='Open actions'>
-            <button id='openItem' type='button' class='btn p-needs-selection'><i class='glyphicon glyphicon-folder-open'></i>Open</button>
-            <button id='openItemTab' type='button' class='btn p-needs-selection'><i class='glyphicon glyphicon-share-alt'></i>Open in new tab</button> 
-            <button id='refresh' type='button' class='btn'><i class='glyphicon glyphicon-refresh'></i>Refresh</button>  
+            <button id='openItem' type='button' class='btn p-needs-selection btn-default'><i class='glyphicon glyphicon-folder-open'></i>Open</button>
+            <button id='openItemTab' type='button' class='btn p-needs-selection btn-default'><i class='glyphicon glyphicon-share-alt'></i>Open in new tab</button> 
+            <button id='refresh' type='button' class='btn btn-default'><i class='glyphicon glyphicon-refresh'></i>Refresh</button>  
         </div>
         
     </div>

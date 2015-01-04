@@ -74,7 +74,7 @@ declare variable $prefs:selected-tenant := req:header("tenant");
 declare variable $prefs:tenant-path := "/db/pekoe/tenants/" || $prefs:selected-tenant ;
 declare variable $prefs:config-collection-name := $prefs:tenant-path || "/config/users";
 declare variable $prefs:user := sm:id()//sm:real/sm:username/text();
-declare variable $prefs:admin-group := "admin_" || $prefs:selected-tenant;
+declare variable $prefs:admin-group := "pekoe-tenant-admins";
 declare variable $prefs:user-is-admin := sm:is-dba($prefs:user) or sm:id()//sm:real//sm:group = $prefs:admin-group;
 declare variable $prefs:default-prefs := collection( $prefs:config-collection-name )/config[@for eq 'default'];
 declare variable $prefs:user-prefs := collection( $prefs:config-collection-name )/config[@for eq $prefs:user];
@@ -155,7 +155,7 @@ declare function prefs:get-bookmarks() {
     let $admin-bookmarks := if ($prefs:user-is-admin) then $prefs:admin-prefs/pref[@for eq 'bookmarks'] else ()
     let $log := util:log("debug", 'USE ADMIN BOOKMARKS >>>>>>>>>>>>>> ?' || $prefs:user-is-admin)
     let $log1 := util:log('debug', $admin-bookmarks)
-    return <pref for='bookmarks'>{($user-bookmarks,$admin-bookmarks)/group}</pref>
+    return <pref for='bookmarks'>{$user-bookmarks/group,$admin-bookmarks/group}</pref>
 };
 
 declare function prefs:get-pref($for) {

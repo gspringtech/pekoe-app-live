@@ -1,24 +1,43 @@
 (:
     Top-level query manages access to files. 
+    Manage Capture and Release
+    Access only via controller (how can I prevent other access?)
 :)
 xquery version "3.0"; 
 
-(:import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "resource-permissions.xqm";:)
 
-declare variable $local:default-user := "pekoe-staff"; (: will want to use the collection-owner instead :)
-declare variable $local:default-group := "pekoe-staff";
-declare variable $local:default-pass := "staffer";
-declare variable $local:open-for-editing        := "rwxr-----";
-declare variable $local:closed-and-available    := "r--r-----"; 
-declare variable $local:collection-permissions  := "rwxrwx---";
+import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "resource-permissions.xqm";
+
+
 declare variable $local:basepath := ""; (: must end with slash :)
 
 declare variable $local:method := request:get-method();
 declare variable $local:action := request:get-parameter("action","");
-declare variable $local:path := request:get-parameter("realpath","");
-declare variable $local:res := local:permissions($local:path);
-declare variable $local:valid-user := $local:res('group') eq $local:res('owner');
-declare variable $local:is-closed-and-available := $local:res('mode') eq $local:closed-and-available;
+declare variable $local:path := request:get-parameter("realpath",""); (: Comes from the controller. :)
+declare variable $local:res := resource-permissions:resource-permissions($local:path);
+declare variable $local:is-closed-and-available := $local:res('mode') eq $resource-permissions:closed-and-available;
+
+(: To be "closed" a file must be r--r------ and 
+   have the same owner and group as its collection.
+   Maybe.
+   
+   What is the advantage of this over just having r--r-----?
+   
+   The main advantage is that I don't have to remember who owned the file before it is opened.
+   
+   The advantage of using the collection-owner and -group is that the -owner should be a group-user and will determine 
+   who can edit the file, while the -group determines who can read the file.
+   
+   The collection will by default inherit its parent-collection owner and group, but it can be modified as needed.
+   However, files within a collection are either "open" or "closed".
+   
+   So - the check for "available" is simply "is it r--r-----"?
+   And then to close it, set it back to collection-owner, collection-group, r--r-----
+   
+   Are there any reasons I might want a different group on the file? Because then I could leave the Group alone - whatever is set, 
+   and simply set the owner and permissions.
+   :)
+
 (:declare variable $local:test := resource-permissions:test('/db');:)
 
 
@@ -62,68 +81,91 @@ declare variable $local:is-closed-and-available := $local:res('mode') eq $local:
     
 :)
 
-declare function local:permissions($href) {
+
+(:declare function local:permissions($href) {
     let $uri := xs:anyURI($href)
     let $file-permissions := sm:get-permissions($uri)
     
     let $parent := util:collection-name($href)
+    let $current-user := sm:id()//sm:real
+    let $current-username := $current-user/sm:username/text()
+    let $users-groups := $current-user//sm:group/text()
     let $collection-permissions := sm:get-permissions(xs:anyURI($parent))
-(:    let $debug := util:log("debug", sm:id()):)
+    let $eponymous-owner-group := $collection-permissions/sm:permission/@owner
+    let $user-can-edit := $users-groups = $eponymous-owner-group (\: collection-owner must also be a group-name and user must belong to that group :\)
 
-    let $current-user := sm:id()//sm:real/sm:username/text()
+    
     let $permissions := map { 
         "collection" := util:collection-name($href),
         "docname" := util:document-name($href),
         "owner" := string($file-permissions/sm:permission/@owner),
         "group" := string($file-permissions/sm:permission/@group),
-        "parent-group" := string($collection-permissions/sm:permission/@group),
+        "col-owner" := string($collection-permissions/sm:permission/@owner),
+        "col-group" := string($collection-permissions/sm:permission/@group),
         "mode" := string($file-permissions/sm:permission/@mode),
-        "user" := $current-user
+        "editor" := $user-can-edit,
+        "user" := $current-user,
+        "username" := $current-username
     }
     return $permissions      
-};
+};:)
 
-declare function local:unlock-file() {
+(: User has the file open and now wants to close it. :)
+declare function local:unlock-file() { 
     let $doc := doc($local:path)
     return util:exclusive-lock($doc, local:really-unlock-file($local:path))
 };
 
+(: NOTE: This MUST be performed within the lock above:)
+declare function local:really-unlock-file($href) {
+    let $uri := xs:anyURI($href)
+    return if ($local:res('owner') eq $local:res('username')) (: and $is-open-for-editing)  -- this caused problems with files that didn't close correctly initially.:) 
+        then (sm:chown($uri, $local:res('col-owner')), sm:chmod($uri,$resource-permissions:closed-and-available), <result>success</result>)
+        else <result>fail</result>
+};
+
+(:  LOCK a resource - making it OPEN for editing.
+    First, is the current user able to edit the file?
+    current-user has group eq collection-owner's group
+    e.g if the current collection is owned by tdbg_admin then the current user must be in that group. 
+    Also, the file should be r--r-----
+:)
 declare function local:lock-file() {
-    if (local:confirm-my-lock($local:res)) 
-    then (util:log("debug", "FILE IS ALREADY LOCKED BY USER"), doc($local:path))
-    else if ($local:path eq "") then <result status="fail">no file</result>
-    else 
-        let $doc := doc($local:path)
-        let $local:action :=  util:exclusive-lock($doc, local:really-lock-file($local:path))
-        let $res := local:permissions($local:path)
-        return if (local:confirm-my-lock($res)) 
-            then $doc   (: Try returning the document itself! :)
-            else (
-                response:set-status-code(404),
-                response:set-header("Content-type","application/xml"),
-                <result status="fail" >{sm:get-permissions(xs:anyURI($local:path))}</result>) 
+    if (not($local:res('editor'))) 
+    then (  response:set-status-code(404),
+            response:set-header("Content-type","application/xml"),
+            <result status="fail" >You cannot edit. {$local:res('user')//sm:group/text()} {sm:get-permissions(xs:anyURI($local:path))}</result>
+            )
+    else
+    let $doc := doc($local:path)
+    let $local:action :=  util:exclusive-lock($doc, local:really-lock-file($local:path))
+    let $res := resource-permissions:resource-permissions($local:path)
+    return if (local:confirm-my-lock($res)) 
+        then $doc   (: Try returning the document itself! :)
+        else (
+            response:set-status-code(404),
+            response:set-header("Content-type","application/xml"),
+            <result status="fail" >{sm:get-permissions(xs:anyURI($local:path))}</result>) 
 };
 
 declare function local:confirm-my-lock($res) { (: Am I now the owner of the file? :)
     util:log("debug","USER:" || $res('user')
             || ", OWNER:" || $res('owner') 
             || ", MODE:" || $res('mode')),
-    ($res('owner') eq $res('user')) and ($res('mode') eq $local:open-for-editing)
+    ($res('owner') eq $res('username')) and ($res('mode') eq $resource-permissions:open-for-editing)
 };
 
 (: NOTE: This MUST be performed within an exclusive-lock.  :)
 declare function local:really-lock-file($href) {
     let $uri := xs:anyURI($href)
-    let $locked := xmldb:document-has-lock($local:res('collection'), $local:res('docname')) 
+    let $locked := xmldb:document-has-lock($local:res('collection'), $local:res('docname')) (: HUH? Didn't I just lock it? :)
     
-    return if ($local:valid-user and not($locked) and $local:is-closed-and-available) 
+    return if (not($locked) and $local:is-closed-and-available) 
     then local:set-open-for-editing($uri)
     else 
-        util:log("warn", "NOT ABLE TO CAPTURE FILE. VALID-USER:" 
-        || (if ($local:valid-user) then 'YES' else 'NO') 
-        || ', UNLOCKED:' 
-        || (if ($locked) then 'NO' else 'YES') 
-        || ', AVAILABLE:' 
+        util:log("warn", "NOT ABLE TO CAPTURE FILE. SYSTEM-LOCKED? " 
+        || (if ($locked) then 'YES' else 'NO') 
+        || ', AVAILABLE? ' 
         || (if ($local:is-closed-and-available) 
             then 'YES'
             else ('NO because:' || $local:res('mode'))) )            
@@ -166,7 +208,7 @@ declare function local:create-collection($basepath as xs:string, $subpath as xs:
                         $subdir,
                         $group, 
                         $group, 
-                        $local:collection-permissions)
+                        $resource-permissions:collection-permissions)
                     
             return ()   
         return local:create-collection($subdir, string-join(tokenize($subpath,'/')[position() gt 1],'/'))    
@@ -192,14 +234,7 @@ declare function local:create-collection($basepath as xs:string, $subpath as xs:
     :\)
 };
 :)
-(: NOTE: This MUST be performed within a lock:)
-declare function local:really-unlock-file($href) {
-    let $uri := xs:anyURI($href)
-    let $debug := util:log("warn", "GOING TO UNLOCK FILE " || $href)
-    return if ($local:res('owner') eq $local:res('user')) (: and $is-open-for-editing)  -- this caused problems with files that didn't close correctly initially.:) 
-        then (sm:chown($uri, $local:res('group')), sm:chmod($uri,$local:closed-and-available), <result>success</result>)
-        else <result>fail</result>           
-};
+
 
 (: Some basic parameter checking might be a good idea!! file path, for starters :)
 (:This is the "save" function end-point. :)
@@ -215,11 +250,12 @@ declare function local:store-post() {
 (: this should be okay - only the owner can modify :)
 
 declare function local:set-open-for-editing($uri) {
-    sm:chown($uri,$local:res('user')), 
+    sm:chown($uri,$local:res('username')), 
     sm:chgrp($uri, $local:res('collection')), 
-    sm:chmod($uri, $local:open-for-editing)
+    sm:chmod($uri, $resource-permissions:open-for-editing)
 };
 
+(: This is a "save" of an open file. :)
 declare function local:store($data, $fullpath) {
 
     let $pathParts := (util:collection-name($fullpath),util:document-name($fullpath)) (: (/db/pekoe/files/test/testing, test1.xml) :)
@@ -234,23 +270,15 @@ declare function local:store($data, $fullpath) {
              else <result status='fail' />
     }; 
     
-    
-declare function local:release-transaction() {
-    if ($local:path eq "") then <result status='fail'>No file</result>
-    else
-         local:unlock-file()
-         
-
-};
 
 
-declare function local:lookup() { (: JESUS - What the hell am I doing here ************************************ :)
+(:declare function local:lookup() { (\: JESUS - What the hell am I doing here ************************************ :\)
     let $query := request:get-parameter('query',"")
     let $src := request:get-parameter('src',"")
  
-    (: This is a potentially unsafe action. !!!!!!!!!!!! It would be good to filter it first!:)
+    (\: This is a potentially unsafe action. !!!!!!!!!!!! It would be good to filter it first!:\)
     return util:eval-inline(xs:anyURI($src),$query)
-};
+};:)
 
 (: List all the files associated with the selected transaction.
     This might be better in print-merge or some other module as it doesn't relate to files. :)
@@ -280,7 +308,7 @@ declare function local:lookup() { (: JESUS - What the hell am I doing here *****
     	}</files>
 
 };:)
-
+(:
 declare function local:count-items() {
     count(collection($local:path))
 };
@@ -297,35 +325,31 @@ declare function local:delete() {
     let $resource := util:document-name($local:path)
     let $collection := util:collection-name($local:path)
     return 
-        if (empty($resource))  (: must be a collection. BE VERY CAREFUL. $collection is the PARENT!!! I inadvertently removed ALL /db/pekoe/files !!! :)
+        if (empty($resource))  (\: must be a collection. BE VERY CAREFUL. $collection is the PARENT!!! I inadvertently removed ALL /db/pekoe/files !!! :\)
         then (xmldb:remove($local:path),concat("collection: ",$local:path))
         else local:delete-file($collection, $resource)
 };
+:)
 
-declare function local:try-something() {
-request:set-attribute("id",1871),request:set-attribute("action","capture"), trace(util:eval(xs:anyURI("/db/pekoe/files/Frog-list.xql")),"********* TRACE **************")
-
-};
 
 (: -----------------------------------  MAIN TRANSACTION QUERY --------------------- :)
 if ($local:method eq "GET") then 
-		    if ($local:action eq 'capture') then	    
-                local:lock-file()
-            else if ($local:action eq 'release') then
-                local:release-transaction()
-(:            else if ($local:action eq 'checkname') then
-                local:check-name():)
-            else if ($local:action eq 'lookup') then
-                local:lookup()
-		   (: else if ($local:action eq 'files') then
-		        local:list-associated-files():) (:'list-files' is not a transaction-list. It examines the transaction's folder.:)
-            else if ($local:action eq 'delete') then 
-                local:delete()
-            else if ($local:action eq 'count') then 
-                local:count-items()
+  if ($local:path eq "") then (response:set-status-code(400),<result status='error'>GET missing $path</result>)
+    else if ($local:action eq 'capture') then	    
+        local:lock-file()
+    else if ($local:action eq 'release') then
+        local:unlock-file()
+(:            else if ($local:action eq 'lookup') then
+        local:lookup():)
+   (: else if ($local:action eq 'files') then
+        local:list-associated-files():) (:'list-files' is not a transaction-list. It examines the transaction's folder.:)
+(:            else if ($local:action eq 'delete') then 
+        local:delete()
+    else if ($local:action eq 'count') then 
+        local:count-items():)
 
-	        else (response:set-status-code(400),<result>GET Action { if ($local:action eq "") then "missing" else concat("unknown: ", $local:action) }</result>)
-        else if ($local:method eq "POST") 
+    else (response:set-status-code(400),<result>GET Action { if ($local:action eq "") then "missing" else concat("unknown: ", $local:action) }</result>)
+else if ($local:method eq "POST") 
         then local:store-post()
         else (response:set-status-code(405),<result>Method not recognised: {$local:method}</result>)
 

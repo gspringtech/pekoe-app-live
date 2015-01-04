@@ -5,7 +5,6 @@ module namespace tenant = "http://pekoe.io/tenant";
 :)
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
 
-
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare variable $tenant:pekoe-tenants := '/db/pekoe/tenants';
 

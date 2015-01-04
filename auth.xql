@@ -58,8 +58,8 @@ function local:login() {
 declare 
 %rest:GET
 %rest:path("/login-error")
-%rest:produces("application/json")
-%output:media-type("application/json")
+%rest:produces("text/html")
+%output:method("html5")
 function local:login-error() {
     if (xmldb:get-current-user() ne "guest") then
     <rest:response>

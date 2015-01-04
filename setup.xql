@@ -8,8 +8,8 @@ import module namespace dbutil = "http://exist-db.org/xquery/dbutil" at '/db/app
 
 (: 
  : Pekoe security has several aspects.
- : First, to login, a user must belong to pekoe-staff
- : Second, to access any resources, the user must belong to tenants-group.
+ : First, to login, a user must belong to pekoe-users
+ : Second, to access any resources, the user must belong to pekoe-tenants.
  : Third, to view a tenant's resources, the user must belong to the <tenant>_staff group.
  : So each <tenant> must have a <tenant>_staff user and group created. (The tenants.xql can do that when a tenant is created.)
  : The <tenant>_staff user DOES NOT belong to pekoe-staff - so this user is unable to login.
@@ -40,9 +40,9 @@ declare function local:fix-collection-and-resource-permissions($col,$groupUser) 
             else 
                 (sm:chown($collection, $groupUser),sm:chgrp($collection,$groupUser))
         }),
-    dbutil:find-by-mimetype(xs:anyURI($collection), "application/xquery", 
+    dbutil:find-by-mimetype(xs:anyURI($col), "application/xquery", 
         function ($resource) {
-            sm:chown($resource, $groupUser), sm:chgrp($resource, $groupUser), sm:chmod($resource,'r--r-----')
+            sm:chown($resource, $groupUser), sm:chgrp($resource, $groupUser), sm:chmod($resource,'r-xr-x---')
         }
     )
 };
@@ -69,4 +69,7 @@ declare function local:common-schemas() {
 (:sm:set-umask('tdbg_staff',util:base-to-integer('006', 8)):)
 (: system:as-user('tdbg_staff','staffer',xmldb:create-collection('/db/pekoe/tenants/tdbg/files','froglet')):)
  
- local:common-schemas()
+(: local:common-schemas():)
+ local:fix-collection-and-resource-permissions('/db/apps/pekoe/tenant-template','pekoe-tenants')
+ 
+ 
