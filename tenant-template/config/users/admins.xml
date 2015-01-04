@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config for="pekoe-admin">
+    <pref for="bookmarks">
+        <group type="locked">
+            <title>Admin</title>
+            <item>
+                <title>Templates</title>
+                <href>/exist/pekoe-app/files.xql?collection=/templates</href>
+                <type>folder</type>
+            </item>
+            <item>
+                <title>Schema-paths</title>
+                <href>/exist/pekoe-app/schema.xql</href>
+                <type>report</type>
+            </item>
+        </group>
+    </pref>
+</config>
