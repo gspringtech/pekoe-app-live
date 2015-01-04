@@ -57,6 +57,16 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
     One option would be to generate a sequence of rows where each row contains an element matching the placeholder-name:
     <row><Date/><booked/><fee/>...</row>
     
+    // changing this. I wonder if it's easier to process?
+    text:a href=http://pekoe.io/cm/txo/property/address#one-line
+    consider also
+    text:a href=http://pekoe.io/cm/txo/property/address?output=one-line&then=uppercase (or some better example of parameter within the template)
+    
+    IMPORTANT to remember that the HREF will contain a valid XPATH ('/txo/property/address')
+    and the anchor-ref or output param will refer to something in the schema.
+    
+    The reason for running this via a generated XQuery is that processing the OUTPUT might require access to the whole document.
+    (CHECK Is this ODT approach different to the Word approach? I think it might be.)
 -->
 
     <!-- process a TABLE ROW containing at least one field -->
@@ -131,9 +141,11 @@ declare function odt:get-hyperlinks($col) {
     for $x in doc($col || "/content.xml")//t:a/@xlink:href[starts-with(., "http://pekoe.io/")]
     let $tenant-link := substring-after($x, "http://pekoe.io/")   (:  bgaedu/school-booking/school/teacher?output=name  :)
     let $tenant := substring-before($tenant-link,'/') (: 'bgaedu' or 'common':)
-    let $link := substring-after($tenant-link,$tenant) (: /school-booking/school/teacher?output=name :)
+    let $full-link := substring-after($tenant-link,$tenant) (: /school-booking/school/teacher?output=name :)
+    let $link := substring-before($full-link,'#')
+    let $output := substring-after($full-link,"#")
     
-    return <link>{attribute for {$tenant}}{attribute path {$link}}</link>
+    return if (normalize-space($link) ne '') then  <link>{attribute for {$tenant}}{attribute path {$link}}{attribute output {$output}}</link> else ()
 };
 
 (:<text:a xlink:type="simple"

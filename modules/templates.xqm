@@ -72,58 +72,32 @@ declare function templates:get-meta-file-name($file) {
 };
 
 (:
-    Consider the alternative.
-    Upload a Template (docx, odt, ods, txt, html)
-    ask for the links.
-    Not sure about ods. BUT the rest have "pekoe:/school-booking/day?meeting-at" or similar. 
-    This is "field-path" || "output-script"
-    There are set modules which can extract these things.
-    
+   
     The desired end-result is 
     1) a list of all templates - and their doctypes (e.g. school-booking) - must be extracted
     2) a list of the Links in a single template - must be extracted
     3) when needed, a generated XQL which uses the links to extract data from a file and merge it using a stylesheet.
     
-    Now the first case is something which will be slow to generate, and only changes when a template is added/removed. 
-    (need a trigger for that)
-    Otherwise, it can, and should, be cached on the browser. (indexedDB)
-    IT IS ONLY USED FOR THE BAG.
+    THE TEMPLATE IS DEFINITIVE. IT IS THE CANONICAL FORM OF THE TEMPLATE. 
+    This is why templates-meta contains generated content and should not be edited.
     
-    
-    The second case is again something that doesn't change unless the template changes.
-    It should also be cached in the browser. It is easy and relatively quick to generate this list of Links.
-    (The slowest part is the unzip/extract)
-    
-    But also consider: unzip/extract MUST be performed every time. (except for HTML and TXT)
-    
-    THE TEMPLATE IS DEFINITIVE. IT IS THE CANONICAL FORM OF THE TEMPLATE.
-    
-    A TRIGGER could take care of all this.
-    
+    The trigger will...
     on add/remove/modify whatever
-    create a new /tenant/x/templates-meta/path/to/template.xql
+    create a new /tenant/x/templates-meta/path/to/template_bundle
     
-    this query will contain
-    
-    get-links()
-    
-    merge()
-    
-    
-    
-    
-    
-    
-
 :)
 
 declare function templates:get-phlinks($template, $tenant-path) {
-    let $log:= util:log("warn","GET-PH-LINKS FOR " || $template)
     let $meta-path := tm:full-meta-path($template) || "/links.xml"
+    let $defaults := templates:get-defaults($template, $tenant-path)
     let $links := doc($meta-path)
     let $doctype := $links/links/data(@for)
     let $site-commands := doc($tenant-path || "/config/site-commands.xml")//commands[@for eq $doctype]
 (:    let $template-commands := $links/commands -- Just an idea.
+    Default fields.
+    Get the default fields from document "default.xxx"
+    Maybe also get any 'default' fields from the current path?
+    These will need to be marked as 'default' so the Form can mark them as such.
 :)
     
     return 
@@ -131,6 +105,14 @@ declare function templates:get-phlinks($template, $tenant-path) {
             <commands>
                 {$site-commands/*}
             </commands>
+            {if (not(empty($defaults))) then <default-links >{attribute for {$defaults/links/string(@for)}}{$defaults//link}</default-links> else () }
             {$links}
         </template>
+};
+
+declare function templates:get-defaults($template, $tenant-path) {
+    let $default-doc-path := $tenant-path || '/templates-meta/default.xml'
+(:    For TESTING, use an XML document here. :)
+    return if (doc-available($default-doc-path)) then doc($default-doc-path)
+    else ()
 };

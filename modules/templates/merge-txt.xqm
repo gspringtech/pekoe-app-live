@@ -36,9 +36,10 @@ declare function merge-txt:get-hyperlinks($col) {
     
     let $tenant-link := substring-after($x, "http://pekoe.io/")   (:  bgaedu/school-booking/school/teacher?output=name  :)
     let $tenant := substring-before($tenant-link,'/') (: 'bgaedu' or 'common':)
-    let $link := substring-after($tenant-link,$tenant) (: /school-booking/school/teacher?output=name :)
-    
-    return if (normalize-space($link) ne '') then <link>{attribute for {$tenant}}{attribute path {$link}}</link> else ()
+    let $full-link := substring-after($tenant-link,$tenant) (: /school-booking/school/teacher?output=name :)
+    let $link := substring-before($full-link, '#')
+    let $output := substring-after($full-link,'#')
+    return if (normalize-space($link) ne '') then <link>{attribute for {$tenant}}{attribute path {$link}}{attribute output {$output}}</link> else ()
 };
 
 declare function merge-txt:transform($data) {
