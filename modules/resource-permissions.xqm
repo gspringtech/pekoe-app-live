@@ -43,7 +43,7 @@ declare function rp:collection-permissions($col) {
         "col-owner" := string($collection-permissions/sm:permission/@owner),
         "col-group" := string($collection-permissions/sm:permission/@group),
         "mode" := string($collection-permissions/sm:permission/@mode),
-        "editor" := $user-can-edit,
+        "editor" := $user-can-edit  or sm:is-dba($current-username),
         "user" := $current-user,
         "username" := $current-username
     }
@@ -72,7 +72,7 @@ declare function rp:resource-permissions($resource) {
         "col-owner" := string($collection-permissions/sm:permission/@owner),
         "col-group" := string($collection-permissions/sm:permission/@group),
         "mode" := string($file-permissions/sm:permission/@mode),
-        "editor" := $user-can-edit,
+        "editor" := $user-can-edit or sm:is-dba($current-username),
         "user" := $current-user,
         "username" := $current-username
     }

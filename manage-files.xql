@@ -29,7 +29,7 @@ declare variable $local:action := request:get-parameter("action","");
 declare variable $local:tenant := replace(request:get-cookie-value("tenant"),"%22","");
 declare variable $local:tenant-path := "/db/pekoe/tenants/" || $local:tenant;
 declare variable $local:current-user := sm:id()//sm:real;
-declare variable $local:tenant-admin-group := "admin_" || $local:tenant;
+declare variable $local:tenant-admin-group :=  $local:tenant || "_admin";
 declare variable $local:user-is-admin-for-tenant := local:user-is-admin-for-tenant();
 
 
@@ -59,7 +59,8 @@ declare function local:quarantined-path($real-path) {
 };
 
 declare function local:user-is-admin-for-tenant() {
-sm:is-dba($local:current-user/sm:username) or sm:get-user-groups($local:current-user/sm:username) = $local:tenant-admin-group
+    util:log('debug','CURRENT USER ' || $local:current-user/sm:username || ' IS DBA? ' || sm:is-dba($local:current-user/sm:username)),
+    sm:is-dba($local:current-user/sm:username) or sm:get-user-groups($local:current-user/sm:username) = $local:tenant-admin-group
 
 };
 
@@ -82,7 +83,7 @@ declare function local:file-upload() {
     let $file := request:get-uploaded-file-data("fname")
     let $log := util:log("debug", "GOING TO STORE " || $name || " INTO COLLECTION " || $collection)
     let $stored := xmldb:store($collection, xmldb:encode-uri($name), $file)
-    return response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection))
+    return local:redirect-to-browse($safe-collection, 'browse','UPLOADED FILE ' || $name) (:response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection)):)
 };
 
 
@@ -154,10 +155,10 @@ declare function local:unlock-file() {
 (:        The file needs to have the same owner and group as its parent-collection. This should be the rule. Thus
 If the parent-coll is owned by :)
         return 
-            if (not(doc-available($real-path))) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
+            if (not(doc-available($real-path))) then (local:redirect-to-browse($quarantined, 'browse','could not unlock the file'))
             else (
             util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "r--r-----"))),
-            (response:set-status-code(205),response:set-header("Location", request:get-uri() || "?collection=" || $quarantined ))
+            (local:redirect-to-browse($quarantined, 'browse','unlocked the file'))
             )
 };
 
@@ -197,7 +198,9 @@ declare function local:do-new() {
     let $file-name := local:good-file-name(request:get-parameter("file-name",""),$item-type)
     let $permissions := resource-permissions:collection-permissions($full-path)
     
-    return if ($item-type eq '' or $file-name eq '' or not($permissions('editor'))) then local:redirect-to-browse($path,"browse","missing information or incorrect permissions")
+    return if ($item-type eq '') then local:redirect-to-browse($path,"browse","missing item-type")
+    else if ($file-name eq '') then local:redirect-to-browse($path,"browse","missing file-name")
+    else if (not($permissions('editor'))) then local:redirect-to-browse($path,"browse","user is not editor")
     else 
         let $result :=  
             if ($item-type eq "collection") then (

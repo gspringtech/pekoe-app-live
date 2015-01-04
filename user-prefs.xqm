@@ -78,7 +78,7 @@ declare variable $prefs:admin-group := "pekoe-tenant-admins";
 declare variable $prefs:user-is-admin := sm:is-dba($prefs:user) or sm:id()//sm:real//sm:group = $prefs:admin-group;
 declare variable $prefs:default-prefs := collection( $prefs:config-collection-name )/config[@for eq 'default'];
 declare variable $prefs:user-prefs := collection( $prefs:config-collection-name )/config[@for eq $prefs:user];
-declare variable $prefs:admin-prefs :=  collection($prefs:config-collection-name )/config[@for eq "admin_" || $prefs:selected-tenant ];
+declare variable $prefs:admin-prefs :=  collection($prefs:config-collection-name )/config[@for eq $prefs:selected-tenant || "_admin"];
 
 (: RESTXQ doesn't provide mch help with errors. I had accidently created two functiions with the same name and arity. :)
 
