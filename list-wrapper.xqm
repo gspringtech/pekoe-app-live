@@ -10,20 +10,55 @@ xquery version "3.0";
         'title' := 'Browsing ' || $colName
         'path' := $logical-path,
         'body' := local:table-wrapper($logical-path, $real-collection-path, ($col-rows,$query-rows,$resource-rows)),
-        'pagination' := list-wrapper:pagination($pagination-map),
-        'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $logical-path)
+        'pagination' := lw:pagination($pagination-map),
+        'breadcrumbs' := lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $logical-path)
         }
         
     It's apparent that this needs a little work.
     
 :)
 
-module namespace list-wrapper = "http://pekoe.io/list/wrapper";
-declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
-declare option output:method "html5";
-declare option output:media-type "text/html";
+module namespace lw = "http://pekoe.io/list/wrapper";
 
-declare function list-wrapper:breadcrumbs($base, $path) {
+
+declare variable $lw:action := request:get-parameter("action","list"); (: Must have useful default for when activated by browse-list:)
+declare variable $lw:method := request:get-method();
+declare variable $lw:path-to-me := request:get-servlet-path();
+declare variable $lw:aust-date-picture :=  "[D01] [M01] [Y0001] [H01]:[m01]:[s01]";
+
+(:~
+: @param $params - the static uri parameters for the breadcrumb link
+: @items - the sequence of things that will be paginated. Expected to be nodes of some kind.
+: also expects to find a request parameter "p" for the current page number and "rpp" for the items per page.
+:)
+declare function lw:pagination-map($params, $items) {
+(:  This should serve a dual purpose: provide the info for procesing the items
+    and then sufficient data for the pagination code in the list-wrapper.
+    TODO allow user to set RPP per list. 
+    (See querytools.xqm )
+    :)
+(: items, rpp, start, end, current, total, params :)
+    let $records-per-page := local:get-request-as-number("rpp",10)
+    let $current-page := local:get-request-as-number("p",1)
+    let $count := count($items)
+    let $total-pages := xs:integer(ceiling($count div $records-per-page))
+    let $start-index := xs:integer(($current-page - 1) * $records-per-page + 1 )
+    let $end-index := xs:integer($start-index + $records-per-page - 1)
+    
+    
+    let $pages-map := map { 
+        "items" := $count,
+        "rpp" := $records-per-page,
+        "start" := $start-index,
+        "end" := $end-index,
+        "current" := $current-page,
+        "total" := $total-pages,
+        "params" := $params
+    }
+    return $pages-map
+};
+
+declare function lw:breadcrumbs($base, $path) {
     let $path-parts := tokenize(substring-after($path,'/'),'/')
     let $last := count($path-parts)
     for $part at $i in $path-parts
@@ -31,7 +66,7 @@ declare function list-wrapper:breadcrumbs($base, $path) {
     return <li>{if ($i eq $last) then $part else <a href='{$base}/{$link}'>{$part}</a>}</li>
 };
 
-declare function list-wrapper:pagination($pagination-map) {
+declare function lw:pagination($pagination-map) {
 let $current := $pagination-map('current')
 let $total := $pagination-map('total')
 let $path-params := if ($pagination-map('params')) then  $pagination-map('params') || '&amp;' else ""
@@ -68,36 +103,10 @@ declare function local:get-request-as-number($param as xs:string, $default as xs
     return if ($requested castable as xs:integer) then xs:integer($requested) else $default 
 };
 
-declare function list-wrapper:pagination-map($params, $items) {
-(:  This should serve a dual purpose: provide the info for procesing the items
-    and then sufficient data for the pagination code in the list-wrapper.
-    Also, may want to take into account the user's preferences.
-    (See querytools.xqm )
-    
-    :)
-    let $records-per-page := 10 (:local:get-request-as-number("rpp",10):)
-    let $current-page := local:get-request-as-number("p",1)
-    let $count := count($items)
-    let $total-pages := xs:integer(ceiling($count div $records-per-page))
-    let $start-index := xs:integer(($current-page - 1) * $records-per-page + 1 )
-    let $end-index := xs:integer($start-index + $records-per-page - 1)
-    
-    
-    let $pages-map := map { 
-        "items" := $count,
-        "rpp" := $records-per-page,
-        "start" := $start-index,
-        "end" := $end-index,
-        "current" := $current-page,
-        "total" := $total-pages,
-        "params" := $params
-    }
-    return $pages-map
-};
 
 
 
-declare function list-wrapper:wrap($content) {
+declare function lw:wrap($content) {
 
 <html>
 <meta charset="utf-8"></meta>

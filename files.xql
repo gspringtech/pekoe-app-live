@@ -102,6 +102,7 @@ declare function local:table-wrapper($path, $colName, $rows) {
             }
             <div class='btn-group'>
                  <form action='/exist/pekoe-app/manage-files.xql' method="POST" enctype="multipart/form-data" class='form-inline'>
+                    <input type='hidden' name='collection' value='{$path}' />                    
                     <span class="btn btn-default btn-file"><input type="file" name="fname"/></span>
                     <button type="submit" value="upload" name="action"  class='btn btn-default'><i class='glyphicon glyphicon-upload'></i>Upload</button>                                                          
                  </form>            
@@ -270,12 +271,13 @@ declare function local:format-collection($logical-path, $real-collection-path, $
 declare function local:format-query($logical-path, $real-collection-path, $child) as element()* {
     let $path := $real-collection-path || '/' || $child
     let $child-path := $logical-path || '/' || $child
+    let $display := substring-before($child,'.')
     let $permissions := sm:get-permissions(xs:anyURI($path)),
         $created := xmldb:created($real-collection-path, $child),
         $modified := xmldb:last-modified($real-collection-path, $child)
     return
-    <tr class='xql' data-href='/exist/pekoe-files/{$child-path}' data-title='{$child}' data-type='report' data-path='{$child-path}'>
-        <td><i class='glyphicon glyphicon-list'></i>{$child}</td>
+    <tr class='xql' data-href='/exist/pekoe-files/{$child-path}' data-title='{$display}' data-type='report' data-path='{$child-path}'>
+        <td><i class='glyphicon glyphicon-list'></i>{$display}</td>
         <td class="perm">{string($permissions/sm:permission/@mode)}</td>
         <td>{string($permissions/sm:permission/@owner)}</td>
         <td>{string($permissions/sm:permission/@group)}</td>
@@ -288,6 +290,7 @@ declare function local:format-query($logical-path, $real-collection-path, $child
 declare function local:format-resource($logical-path, $real-collection-path, $child as xs:string) {
     
     let $file-path := concat($real-collection-path,"/",$child) (: This is the real path in the /db :)
+    
 (:    let $log := util:log('warn', "FORMAT RESOURCE FOR " || $child || " at PATH " || $file-path):)
         return if (not(sm:has-access(xs:anyURI($file-path),'r'))) then ()
         else 
@@ -431,20 +434,47 @@ concat('["',string-join($results,'", "'),'"]')
 
 declare function local:xpath-search() {
     let $logical-path := request:get-parameter("collection",$local:base-collection)
-    let $col := $local:tenant-path || $logical-path (: $colpath is expected to start with a slash :)
+    let $colpath := $local:tenant-path || $logical-path (: $colpath is expected to start with a slash :)
     let $search := request:get-parameter("xpath",())
-    let $xpathsearch := concat("collection('",$col,"')", $search)
+    let $xpathsearch := concat("collection('",$colpath,"')", $search)
     
     let $results  := util:eval($xpathsearch) (: get all the result nodes :)
     let $jobs := for $f in $results return root($f)
+    
     let $params := "collection=" || $logical-path || "&amp;action=xpath&amp;xpath=" || $search 
     let $pagination-map := list-wrapper:pagination-map($params, $jobs)
     let $count := $pagination-map('items')
-(:    let $log := util:log("debug", concat("################################### XPATH Search: ",$xpathsearch, " got COUNT  ",$count) ):)
     let $start := $pagination-map('start'),
         $end := $pagination-map('end')
-(:    let $log := util:log("warn", "START " || $start || " END " || $end):)
-    let $resource-rows := for $c in $jobs[position() = $start to $end] order by $c return local:format-resource(util:collection-name($c), $col, util:document-name($c))
+    let $resource-rows := for $c in $jobs[position() = $start to $end] order by $c 
+        return local:format-resource(util:collection-name($c), util:collection-name($c), util:document-name($c))
+
+(:    results required for the wrapper..:)
+     let $results := map {
+        'title' := $logical-path,
+        'path' := $logical-path,
+        'body' := local:table-wrapper($logical-path, $colpath, $resource-rows),
+        'pagination' := list-wrapper:pagination($pagination-map),
+        'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $logical-path)
+        }
+    return
+       list-wrapper:wrap($results)  
+};
+
+declare function local:display-search-results() {
+    let $logical-path := request:get-parameter("collection",$local:base-collection)
+    let $colpath := $local:tenant-path || $logical-path (: $colpath is expected to start with a slash :)
+    let $col := collection($colpath)
+    let $searchString := request:get-parameter("searchstr",())
+    let $jobs := for $n in $col/*[contains(., $searchString)] return root($n)
+
+    let $params := "collection=" || $logical-path || "&amp;action=Search&amp;searchstr=" || $searchString
+    let $pagination-map := list-wrapper:pagination-map($params, $jobs)
+    let $count := $pagination-map('items')
+    let $start := $pagination-map('start'),
+        $end := $pagination-map('end')
+    let $resource-rows := for $c in $jobs[position() = $start to $end] order by $c 
+        return local:format-resource(util:collection-name($c), util:collection-name($c), util:document-name($c))
 
 (:    results required for the wrapper..:)
      let $results := map {
@@ -455,14 +485,13 @@ declare function local:xpath-search() {
         'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $logical-path)
         }
     return
-       list-wrapper:wrap($results)
-       
-       
+       list-wrapper:wrap($results)  
 };
     
 
-declare function local:display-search-results() {
-    let $path := request:get-parameter("collection",$local:base-collection)
+declare function local:xdisplay-search-results() {
+    let $logical-path := request:get-parameter("collection",$local:base-collection)
+(:    let $path := request:get-parameter("collection",$local:base-collection):)
     let $colpath := $local:tenant-path ||  $path
     let $col := collection($colpath ) (:Base collection for search:)
     let $callback-name := util:uuid()
@@ -529,11 +558,8 @@ declare function local:display-search-results() {
             </tr>
         }
     </table>
-    
-    <script type='text/javascript'> 
-
-    </script>
     </div>
+    
 };
 
 
