@@ -48,8 +48,7 @@ function pekoe-schema:get-schema($for) {
 (: Rather than having to create a list of paths every time, why don't I store them somewhere? Config? Next to the schema?
 :)
 (: Probably should use the schema path to determine the 'tenant' because it could be a 'common' schema. :)
-declare 
-function pekoe-schema:make-paths($link-path, $pekoe-schema) {
+declare function pekoe-schema:make-paths($link-path, $pekoe-schema) {
     
     for $f in $pekoe-schema/(field,fragment-ref)[starts-with(@path,'/')]
 
@@ -62,12 +61,10 @@ function pekoe-schema:make-paths($link-path, $pekoe-schema) {
             order by $output-name
             return <tr><td>&#160;</td><td><a href='{$full-path || '?output=' || $output-name}'>{$output-name}</a></td></tr>
             )
-    
-    
 };
 
 declare function pekoe-schema:schema-page($schema) {
-   let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant || $schema/@for
+   let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant || $schema/@for || '/'
 
    let $page := 
      <div class='container-fluid'>
@@ -130,7 +127,7 @@ declare function pekoe-schema:list-schemas() {
 };
 
 (: ************************* List the schemas and then their fields and outputs in the selected schema **************** :)
-
+   
    let $for := request:get-parameter("for","")
     let $available := pekoe-schema:available-schemas()
    let $schema := $available[@for eq $for]
