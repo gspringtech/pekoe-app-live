@@ -39,7 +39,7 @@ declare function local:fix-collection-and-resource-permissions($col,$groupUser) 
             if ($resource ne '') then 
                 (sm:chown($resource, $groupUser),sm:chgrp($resource, $groupUser),sm:chmod($resource,'r--r-----'))
             else 
-                (sm:chown($collection, $groupUser),sm:chgrp($collection,$groupUser),sm:chmod($resource,'rwxrwx---'))
+                (sm:chown($collection, $groupUser),sm:chgrp($collection,$groupUser),sm:chmod($collection,'rwxrwx---'))
         }),
     dbutil:find-by-mimetype(xs:anyURI($col), "application/xquery", 
         function ($resource) {
