@@ -181,7 +181,7 @@ declare function prefs:set-pref($for, $pref-item) {
     let $update-or-replace := if (exists($conf/pref[@for eq $for])) 
         then ( update replace $conf/pref[@for eq $for] with $good-pref)
         else (update insert $good-pref into $conf)
-    return ()
+    return <result>success</result>
 };
 
 ()
