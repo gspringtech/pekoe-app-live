@@ -370,7 +370,7 @@ declare function local:format-binary-resource($logical-path, $real-collection-pa
     
         let $short-name := substring-before($child, ".")
         let $doctype := substring-after($child,".")
-        let $href := $doctype || ":/exist/pekoe-files" || $safe-path
+        let $href :=  "/exist/pekoe-files" || $safe-path (: want user to be able to download this file :)
         (:let $size-indicator := string(count(doc($file-path)/descendant-or-self::node())) || "*":)
 
         order by lower-case($child)
