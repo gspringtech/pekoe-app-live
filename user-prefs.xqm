@@ -155,7 +155,7 @@ declare function prefs:get-bookmarks() {
     let $admin-bookmarks := if ($prefs:user-is-admin) then $prefs:admin-prefs/pref[@for eq 'bookmarks'] else ()
     let $log := util:log("debug", 'USE ADMIN BOOKMARKS >>>>>>>>>>>>>> ?' || $prefs:user-is-admin)
     let $log1 := util:log('debug', $admin-bookmarks)
-    return <pref for='bookmarks'>{$user-bookmarks/group,$admin-bookmarks/group}</pref>
+    return <pref for='bookmarks' tenant='{$prefs:selected-tenant}'>{$user-bookmarks/group,$admin-bookmarks/group}</pref>
 };
 
 declare function prefs:get-pref($for) {
