@@ -38,7 +38,7 @@ declare function lw:pagination-map($params, $items) {
     (See querytools.xqm )
     :)
 (: items, rpp, start, end, current, total, params :)
-    let $records-per-page := local:get-request-as-number("rpp",10)
+    let $records-per-page := local:get-request-as-number("rpp",20)
     let $current-page := local:get-request-as-number("p",1)
     let $count := count($items)
     let $total-pages := xs:integer(ceiling($count div $records-per-page))
