@@ -1,7 +1,7 @@
 xquery version "3.0";
 
 import module namespace dbutil = "http://exist-db.org/xquery/dbutil" at '/db/apps/shared-resources/content/dbutils.xql';
-
+import module namespace tenant = "http://pekoe.io/tenant" at '/db/apps/pekoe/tenants.xql';
 (:
  : Deploy
  : :)
@@ -31,14 +31,15 @@ import module namespace dbutil = "http://exist-db.org/xquery/dbutil" at '/db/app
     xmldb:copy('/db/apps/pekoe/tenant-template','/system/config/db/pekoe/tenants/' || $tenant || '/templates', 'collection.xconf')
  };
 
+(: This only does the files - not the collections. :)
 declare function local:fix-collection-and-resource-permissions($col,$groupUser) {
-(:  dbutil:scan doesn't process binaries  :)
+(:  dbutil:scan doesn't process binaries   :)
     dbutil:scan(xs:anyURI($col),
         function ($collection, $resource) { 
             if ($resource ne '') then 
                 (sm:chown($resource, $groupUser),sm:chgrp($resource, $groupUser),sm:chmod($resource,'r--r-----'))
             else 
-                (sm:chown($collection, $groupUser),sm:chgrp($collection,$groupUser))
+                (sm:chown($collection, $groupUser),sm:chgrp($collection,$groupUser),sm:chmod($resource,'rwxrwx---'))
         }),
     dbutil:find-by-mimetype(xs:anyURI($col), "application/xquery", 
         function ($resource) {
@@ -55,7 +56,7 @@ declare function local:common-schemas() {
   return sm:get-permissions($path)
 };
 
-
+(: MUST INSTALL THE TRIGGER FOR TEMPLATES !!!!:)
 
 (:tenant:create('bkfa','Birthing Kit Foundation Australia'):)
 (:sm:get-permissions(xs:anyURI('/db')):)
@@ -70,6 +71,8 @@ declare function local:common-schemas() {
 (: system:as-user('tdbg_staff','staffer',xmldb:create-collection('/db/pekoe/tenants/tdbg/files','froglet')):)
  
 (: local:common-schemas():)
- local:fix-collection-and-resource-permissions('/db/apps/pekoe/tenant-template','pekoe-tenants')
+(: local:fix-collection-and-resource-permissions('/db/apps/pekoe/tenant-template','pekoe-tenants'):)
+ local:fix-collection-and-resource-permissions('/db/pekoe/tenants/cm','cm_staff')
+(:tenant:fix-ownership('/db/pekoe/tenants/cm', 'cm_staff'):)
  
  
