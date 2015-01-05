@@ -2,8 +2,9 @@ module namespace pqt="http://gspring.com.au/pekoe/querytools";
 import module namespace sn="http://gspring.com.au/pekoe/serial-numbers" at "serial-numbers.xqm";
 import module namespace prefs="http://gspring.com.au/pekoe/user-prefs" at "ui-prefs.xqm";
 
+(: TODO - rewrite or delete this script :)
 
-declare variable $pqt:admin-pass := "XXXXXX"; (: TODO replace with setUid script :)
+declare variable $pqt:admin-pass := ""; (: TODO replace with setUid script :)
 
 declare function pqt:ancestry($n as node()) {
     for $p in $n/ancestor-or-self::* return (name($p))
@@ -125,7 +126,7 @@ declare function pqt:format-as-aust-date($d) {
 declare function pqt:year-month-file-path($prefix, $id) {
     let $currentD := current-date()
     return (
-        concat(year-from-date($currentD), "/", sn:pad-number("00",month-from-date($currentD))),
+        concat(format-date(current-date(),"[Y]/[M01]")),
         concat($prefix, "-", $id, ".xml"))
 };
 
@@ -134,10 +135,8 @@ declare function pqt:year-month-with-id-as-path($prefix, $id) {
     let $currentD := current-date()
     return 
         concat (
-            year-from-date($currentD), '/', 
-            sn:pad-number("00",month-from-date($currentD)), '/', 
+            format-date(current-date(),"[Y]/[M01]"), '/',
             concat($prefix, "-", $id))
-            
 };
 
 
