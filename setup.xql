@@ -17,7 +17,6 @@ import module namespace tenant = "http://pekoe.io/tenant" at '/db/apps/pekoe/ten
  : All resources belonging to a tenant are owned by the <tenant>_staff user, and have r--r----- mode.
  : These resources are "closed-and-available". 
  : When a User opens a resource for editing, the user becomes the owner and the mode changes to rwxr-----.
- : 
  :  :)
 
 (:

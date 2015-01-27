@@ -17,7 +17,7 @@ xquery version "3.0";
    
 :)
 module namespace templates="http://www.gspring.com.au/pekoe/admin-interface/templates";
-import module namespace tm="http://pekoe.io/templates/management" at "templates/template-trigger.xqm";
+import module namespace tm="http://pekoe.io/templates/management" at "../templates/template-trigger.xqm";
 
 declare copy-namespaces preserve, inherit; 
 
@@ -109,6 +109,8 @@ declare function templates:get-phlinks($template, $tenant-path) {
             {$links}
         </template>
 };
+
+(:This doesn't work. It doesn't alllow for different doctypes. :)
 
 declare function templates:get-defaults($template, $tenant-path) {
     let $default-doc-path := $tenant-path || '/templates-meta/default.xml'

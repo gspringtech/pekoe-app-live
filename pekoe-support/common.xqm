@@ -1,13 +1,19 @@
 module namespace pekoe="http://www.gspring.com.au/pekoe";
+(:http://www.w3.org/TR/xpath-functions-30/#func-format-date
+    Also see date picture in XSLT 2.0 Programmers ref.
+:)
+declare variable $pekoe:aust-short-date := "[D01]-[M01]-[Y]";
+declare variable $pekoe:aust-long-date := "[D1o] [MNn], [Y]";
+
 
 declare function pekoe:aust-short-date ($d) {
-    if ($d castable as xs:date) then datetime:format-date($d,"dd-M-yyyy")
-    else if ($d castable as xs:dateTime) then datetime:format-dateTime($d,"dd-M-yyyy") 
+    if ($d castable as xs:date) then format-date($d,$pekoe:aust-short-date)
+    else if ($d castable as xs:dateTime) then format-dateTime($d,$pekoe:aust-short-date) 
     else ""
 };
 declare function pekoe:long-date ($d) {
-    if ($d castable as xs:date) then datetime:format-date($d,"dd MM yyyy")
-    else if ($d castable as xs:dateTime) then datetime:format-dateTime($d,"dd MM yyyy") 
+    if ($d castable as xs:date) then format-date($d, $pekoe:aust-long-date)
+    else if ($d castable as xs:dateTime) then format-dateTime($d, $pekoe:aust-long-date) 
     else ""
 };
 
@@ -19,6 +25,7 @@ return (pekoe:split-three($first),$last-three)
 ) else ()
 };
 
+(: TODO replace with format-number :)
 declare function pekoe:currency($any-val) {
 if (not($any-val castable as xs:decimal)) then concat("NaN(",$any-val,")") else 
 
