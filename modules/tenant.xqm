@@ -11,17 +11,42 @@ declare variable $tenant:accessible-cookie := request:get-cookie-value("tenant")
 declare variable $tenant:tenant := replace($tenant:accessible-cookie,"%22","");
 declare variable $tenant:tenant-path := "/db/pekoe/tenants/" || $tenant:tenant;
 
+ declare function tenant:fix-serial-numbers($tenant) {
+    let $collection := '/db/pekoe/tenants/' || $tenant || '/config/serial-numbers'
+    
+    for $r in xmldb:get-child-resources($collection)
+    let $resource := xs:anyURI($collection || "/" || $r)
+    return tenant:serial-number-file($tenant, $resource)
+ };
+ 
+ declare function tenant:serial-number-file($tenant, $resource as xs:anyURI) {
+    let $user := 'admin'
+    let $group := $tenant || '_staff'
+    let $xml-permissions := 'rw-rw----'
+    return (
+        sm:chown($resource,$user),
+        sm:chgrp($resource,$group),
+        sm:chmod($resource,$xml-permissions)
+    )
+ };
 
 (: Recursively apply ownership to a collection hierarchy :)
 declare function tenant:fix-ownership($collection, $owner-name, $group-name) {
     sm:chown($collection,$owner-name),
     sm:chgrp($collection,$group-name),
-    for $r in xmldb:get-child-resources($collection)
-    let $resource := $collection || "/" || $r
-    return (sm:chown($resource,$owner-name),sm:chgrp($resource,$group-name)),
-    for $c in xmldb:get-child-collections($collection)
-    let $coll := $collection || "/" || $c
-    return tenant:fix-ownership($coll,$owner-name,$group-name)
+    sm:chmod($collection, 'rwxrwx---'),
+    for $r in xmldb:get-child-resources(string($collection))
+    let $resource := xs:anyURI($collection || "/" || $r)
+(:    let $dub := util:log('warn', '$$$$$$$$$$$$$$$ FIX CHILD RESOURCE ' || $r):)
+    return (
+        sm:chown($resource,$owner-name),
+        sm:chgrp($resource,$group-name),
+        if (util:is-binary-doc($resource)) then (sm:chmod(xs:anyURI($resource),'rwxr-x---')) else  (sm:chmod(xs:anyURI($resource),'r--r-----'))
+        
+    ),
+    for $c in xmldb:get-child-collections(string($collection))
+        let $coll := xs:anyURI($collection || "/" || $c)
+        return tenant:fix-ownership($coll,$owner-name,$group-name)
 };
 
 (:(\: Recursively apply ownership to a collection hierarchy :\)
@@ -71,4 +96,21 @@ declare function tenant:create($key, $client-name){
     return 
     
     $new-tenant
+};
+
+declare function tenant:local-path($real-path) {
+    substring-after($real-path, $tenant:tenant-path)
+};
+
+
+declare function tenant:quarantined-path($real-path) {
+    '/exist/pekoe-files' || substring-after($real-path, $tenant:tenant-path)
+};
+
+declare function tenant:real-path($quarantined-path) {
+    $tenant:tenant-path || substring-after($quarantined-path, '/exist/pekoe-files')
+};
+
+declare function tenant:get-tenant(){
+    ()
 };

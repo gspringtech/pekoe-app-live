@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<numbers-as-word>
+    <units>
+        <value>one</value>
+        <value>two</value>
+        <value>three</value>
+        <value>four</value>
+        <value>five</value>
+        <value>six</value>
+        <value>seven</value>
+        <value>eight</value>
+        <value>nine</value>
+        <value>ten</value>
+        <value>eleven</value>
+        <value>twelve</value>
+        <value>thirteen</value>
+        <value>fourteen</value>
+        <value>fifteen</value>
+        <value>sixteen</value>
+        <value>seventeen</value>
+        <value>eighteen</value>
+        <value>nineteen</value>
+    </units>
+    <tens>
+        <value>ten</value>
+        <value>twenty</value>
+        <value>thirty</value>
+        <value>forty</value>
+        <value>fifty</value>
+        <value>sixty</value>
+        <value>seventy</value>
+        <value>eighty</value>
+        <value>ninety</value>
+    </tens>
+    <other>
+        <value int="0">zero</value>
+        <value int="100"> hundred</value>
+        <value int="1000"> thousand</value>
+        <value int="1000000"> million</value>
+    </other>
+    <conjunctions xml:space="preserve">
+        <join id="integer-to-decimal"> and </join>
+        <join id="to-hundreds"> </join>
+        <join id="to-tens"> and </join>
+        <join id="tens-to-digits">-</join>
+    </conjunctions>
+    <currency-words>
+        <integer> dollar</integer>
+        <integers> dollars</integers>
+        <decimal> cent</decimal>
+        <decimals> cents</decimals>
+    </currency-words>
+</numbers-as-word>

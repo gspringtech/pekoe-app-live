@@ -22,6 +22,8 @@ function local:login() {
     ,
     <html><head><title>Login</title></head>
   <body>
+<h1>Pekoe Login</h1>
+  <p>Please login again to Pekoe</p>
   <div>
                           <form action='/exist/j_security_check'>
                             <input type="text" name="j_username" placeholder="Username" />
@@ -32,27 +34,6 @@ function local:login() {
                         </body>
                         </html>
 };
-(:
-
-declare 
-%rest:GET
-%rest:path("/login/form-test")
-%output:media-type("text/html")
-%output:method("html5")
-function local:login() {
-  <html><head><title>Login</title></head>
-  <body>
-  <div>
-                          <form action='/exist/j_security_check' ng-submit="submit()">
-                            <input ng-model="user.username" type="text" name="user" placeholder="Username" />
-                            <input ng-model="user.password" type="password" name="pass" placeholder="Password" />
-                            <input type="submit" value="Login" />
-                        </form>
-                        </div>
-                        </body>
-                        </html>
-};:)
-
 
 
 declare 

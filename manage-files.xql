@@ -1,5 +1,7 @@
 xquery version "3.0";
 (: 
+    THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN.
+    
     Manage files and collections. Close, Upload, Create, Delete.
     This file has setUid applied. It will run as admin.
     THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN.
@@ -18,8 +20,7 @@ declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare option output:method "html5";
 declare option output:media-type "text/html";
 
-import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
-import module namespace list-wrapper = "http://pekoe.io/list/wrapper" at "list-wrapper.xqm";
+import module namespace rp = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
 
 
 declare variable $local:root-collection := "/db/pekoe";
@@ -83,10 +84,25 @@ declare function local:file-upload() {
     let $file := request:get-uploaded-file-data("fname")
     let $log := util:log("debug", "GOING TO STORE " || $name || " INTO COLLECTION " || $collection)
     let $stored := xmldb:store($collection, xmldb:encode-uri($name), $file)
+    let $permissions := rp:set-default-permissions($stored)
     return local:redirect-to-browse($safe-collection, 'browse','UPLOADED FILE ' || $name) (:response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection)):)
 };
 
-
+declare function local:file-upload-to-job() {
+    let $job := request:get-parameter("job",()) (:"car:/exist/pekoe-files/files/cars/2015/06/000001.xml":)
+    let $job-path := $local:tenant-path || substring-after($job, '/exist/pekoe-files')
+    let $collection := util:collection-name($job-path)
+    let $log := util:log('info','UPLOAD TO JOB ' || $collection)
+    
+(:    let $safe-collection := request:get-parameter("collection", ()):)
+(:    let $collection := $local:tenant-path || $safe-collection:)
+    let $name := request:get-uploaded-file-name("file")
+    let $file := request:get-uploaded-file-data("file")
+    let $log := util:log("debug", "GOING TO STORE " || $name || " INTO COLLECTION " || $collection)
+    let $stored := xmldb:store($collection, xmldb:encode-uri($name), $file)
+    let $permissions := rp:set-default-permissions($stored)
+    return <result>Stored {$name} in {$collection}</result>
+};
 
 declare function local:good-file-name($n,$type) {
     if ($type ne 'collection') 
@@ -145,27 +161,34 @@ declare function local:unlock-file() {
     return if ($path eq "" ) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
     else
         let $real-path := $local:tenant-path || $path 
+        let $permissions := rp:resource-permissions($real-path)
         let $uri := xs:anyURI($real-path)
-(:        let $log := util:log("warn", "URI: " || request:get-uri()      || " VS URL: " || request:get-url()):)
-(:                                      URI:      /exist/pekoe-app/files.xql  VS URL:      http://owl.local/exist/pekoe-app/files.xql:)
-        let $parent := util:collection-name($real-path)
-        let $quarantined := local:quarantined-path($parent)
-        let $collection-permissions := sm:get-permissions(xs:anyURI($parent))
-        let $group-owner := $collection-permissions/sm:permission/data(@group)
-(:        The file needs to have the same owner and group as its parent-collection. This should be the rule. Thus
-If the parent-coll is owned by :)
+(:        let $parent := util:collection-name($real-path):)
+(:        TODO - use mime type and/or check for binary or collection to handle XQuery, Collection or other data types. :)
+        let $quarantined := local:quarantined-path(util:collection-name($real-path))
+(:        let $collection-permissions := sm:get-permissions(xs:anyURI($parent)):)
+(:        let $group-owner := $collection-permissions/sm:permission/data(@group):)
+           (:        The file needs to have the same owner and group as its parent-collection. This should be the rule. Thus
+           If the parent-coll is owned by :)
         return 
             if (not(doc-available($real-path))) then (local:redirect-to-browse($quarantined, 'browse','could not unlock the file'))
             else (
-            util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "r--r-----"))),
+            (:util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "rw-r-----"))),:) 
+            util:exclusive-lock(doc($real-path), (sm:chown($uri, $permissions?col-owner), sm:chgrp($uri, $permissions?col-group), sm:chmod($uri, $rp:closed-and-available))),
             (local:redirect-to-browse($quarantined, 'browse','unlocked the file'))
             )
 };
 
 declare function local:redirect-to-browse($path, $action,$message) {
-    util:log('info',$message),
-    response:redirect-to(xs:anyURI("/exist/pekoe-app/files.xql" || '?collection=' || $path))
+    util:log('info',$message), response:redirect-to(xs:anyURI(request:get-header('Referer')))  (: Beautiful :)
 };
+
+declare function local:do-data() {
+(:  /db/pekoe/tenants/bkfa/exist/pekoe-files/files/members/2015/member-000002.xml.  :)
+    let $resource := request:get-parameter("path",())
+    let $resource-full-path :=  '/exist/pekoe-files' || $resource
+    return response:redirect-to(xs:anyURI($resource-full-path))
+}; 
 
 
 (:  This is nice, but doesn't add an ID and allows creation of fragment-elements (like "item" which is a child of ca-resources) HUH? Why? :)
@@ -180,7 +203,7 @@ declare function local:new-file($doctype, $colname,$file-name, $permissions) {
     let $uri := xs:anyURI($new)
     let $chown := sm:chown($uri, $permissions('col-owner'))
     let $chgrp := sm:chgrp($uri, $permissions('col-group'))
-    let $chmod := sm:chmod($uri, $resource-permissions:closed-and-available)
+    let $chmod := sm:chmod($uri, $rp:closed-and-available)
     return 'created file ' || $new 
 };
 
@@ -195,11 +218,12 @@ declare function local:do-new() {
     let $path := request:get-parameter("collection",$local:base-collection)
     let $full-path := $local:tenant-path || $path
     let $item-type := request:get-parameter("doctype","") 
-    let $file-name := local:good-file-name(request:get-parameter("file-name",""),$item-type)
-    let $permissions := resource-permissions:collection-permissions($full-path)
+    let $fn := request:get-parameter("file-name","")
+    let $file-name := local:good-file-name($fn,$item-type)
+    let $permissions := rp:collection-permissions($full-path)
     
     return if ($item-type eq '') then local:redirect-to-browse($path,"browse","missing item-type")
-    else if ($file-name eq '') then local:redirect-to-browse($path,"browse","missing file-name")
+    else if ($fn eq '') then local:redirect-to-browse($path,"browse","missing file-name")
     else if (not($permissions('editor'))) then local:redirect-to-browse($path,"browse","user is not editor")
     else 
         let $result :=  
@@ -208,11 +232,47 @@ declare function local:do-new() {
                let $uri := xs:anyURI($new)
                let $chown := sm:chown($uri, $permissions('col-owner'))
                let $chgrp := sm:chgrp($uri, $permissions('col-group'))
-               let $chmod := sm:chmod($uri, $resource-permissions:collection-permissions)
+               let $chmod := sm:chmod($uri, $rp:collection-permissions)
                return 'created collection ' || $new )
             else local:new-file($item-type,$full-path,$file-name, $permissions)
 
         return local:redirect-to-browse($path, "browse", $result )
+};
+
+declare function local:do-move-up(){
+    let $resource := request:get-parameter("path",())
+    let $resource-full-path := $local:tenant-path || $resource
+    let $collection := util:collection-name($resource-full-path)
+    let $parent-collection := util:collection-name($collection)
+    
+    (: ************* TODO - replace xmldb:move with store and remove. Add check for existing file ******************    :)
+    
+    let $resource-doc := util:document-name($resource-full-path)
+    let $original-collection := substring-after($collection,$local:tenant-path)
+    
+    let $log: = util:log('debug', '*************** MOVE ' || $resource || ' UP TO ' || $parent-collection || ' and redirect to ' || $original-collection)
+    let $move := if ($resource-doc) 
+        then xmldb:move($collection, $parent-collection, $resource-doc)
+        else if ($parent-collection ne $local:tenant-path) then xmldb:move($resource-full-path, $parent-collection)
+        else ()
+    return local:redirect-to-browse($original-collection, "browse", "moved")
+};
+
+declare function local:do-move(){
+    let $target := request:get-parameter("collection",())
+    let $target-full-path := $local:tenant-path || $target
+    let $resource := request:get-parameter("resource",())
+    let $resource-full-path := $local:tenant-path || $resource
+    let $resource-doc := util:document-name($resource-full-path)
+    let $original-collection := util:collection-name($resource)
+    (: ************* TODO - replace xmldb:move with store and remove. Add check for existing file ******************    :)    
+    
+    let $log: = util:log('info', '*************** MOVE ' || $resource-doc || ' INTO ' || $target || ' and redirect to ' || $original-collection)
+    let $move := if ($resource-doc) 
+        then xmldb:move(util:collection-name($resource-full-path), $target-full-path, $resource-doc)
+        else if ($resource-full-path ne $target-full-path) then xmldb:move($resource-full-path,$target-full-path)
+        else ()
+    return local:redirect-to-browse($original-collection, "browse", "moved")
 };
 
 declare function local:title($path-parts) {
@@ -220,17 +280,44 @@ declare function local:title($path-parts) {
     return concat(upper-case(substring($t,1,1)), substring($t,2))
 };
 
+(: TODO: WRITE AND TEST THE JAVASCRIPT - NEEDS A PROMPT FOR NEW-NAME :)
+declare function local:do-rename(){
+    let $target := request:get-parameter("collection",())
+    let $target-full-path := $local:tenant-path || $target
+    let $resource := request:get-parameter("resource",())
+    let $new-name := request:get-parameter("new-name",())
+    let $resource-old-name := $local:tenant-path || $resource
+    let $resource-new-name := $local:tenant-path || $new-name
+    let $resource-doc := util:document-name($resource-old-name)
+    let $conflicting-doc := util:document-name($resource-new-name)
+    let $original-collection := util:collection-name($resource)
+    
+    let $log: = util:log('warn', '*************** RENAME ' || $resource-doc || ' TO ' || $new-name)
+     (: let $move := if ($conflicting-doc) then local:redirect-to-browse($original-collection, "browse", "NOT MOVED - CONFLICT WITH EXISTING DOC " || $new-name)
+        else if ($resource-doc) 
+        then xmldb:rename($original-collection, $target-full-path, $resource-doc)
+(\:      else rename collection  :\)
+        else ():)
+    return local:redirect-to-browse($original-collection, "browse", "renamed")
+};
+
 (: ************************** MAIN QUERY *********************** :)
 
-
+(: THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN. :)
         
 (:        try {:)
     (: NO default action :)
          if ($local:action eq "unlock") then local:unlock-file()
     else if ($local:action eq "upload") then local:file-upload()
+    else if ($local:action eq "upload-to-job") then local:file-upload-to-job()
     else if ($local:action eq "create")    then local:do-new()
     else if ($local:action eq "delete") then local:do-delete()
+    else if ($local:action eq "move")   then local:do-move()
+    else if ($local:action eq "move-up") then local:do-move-up()
+    else if ($local:action eq "rename") then local:do-rename()
+    else if ($local:action eq "data") then local:do-data()
     else <result status='error'>Unknown action {$local:action} </result>
     
 (:    } catch * { "CAUGHT ERROR " || $err:code || ": " || $err:description || " " || $local:action }:)
             
+(: THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN. :)

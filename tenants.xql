@@ -7,6 +7,8 @@ import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm
 
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare variable $tenant:pekoe-tenants := '/db/pekoe/tenants';
+declare variable $tenant:selected-tenant := req:header("tenant");
+(: I need to remove this. I also want to replace all RestXQ with standard controller-based queries. :)
 
 
 declare 
@@ -20,11 +22,9 @@ declare
 %output:method("json"):)
 function tenant:list() {
     <tenants for="{xmldb:get-current-user()}">{ 
-    (: The advantage of simply looking at /db/pekoe/tenants is I don't need to check if the user 
-        is authorized - xmldb:collection-available will do that for me. 
-        The disadvantage is that I can't easily make a 'common' tenant.
-        I'll have to think of something else.
-        :)
+    if ( $tenant:selected-tenant and sm:has-access(xs:anyURI($tenant:pekoe-tenants || '/' || $tenant:selected-tenant), 'r--')) then <tenant key="{$tenant:selected-tenant}" />
+    else
+
     for $t in xmldb:get-child-collections($tenant:pekoe-tenants)
     let $coll := $tenant:pekoe-tenants || "/" || $t
         return if (not(sm:has-access(xs:anyURI($coll), 'r--'))) then ()

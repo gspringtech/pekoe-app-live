@@ -19,23 +19,30 @@ declare option exist:serialize "method=text media-type=text/plain";
     
 :)
 
-(: --------------- Extract Content and links from TXO ------------------------ :)
-(: Links should be in the same format as in the other templates - a full URI :)
+(: --------------- Extract Content and links from TEXT ------------------------ :)
+(: Links should be in the same format as in the other templates - an URI beginning with http://pekoe.io/ :)
 
 declare function merge-txt:extract-content($uri,$col) {
     xmldb:store($col, "content.xml",<content>{util:binary-to-string(util:binary-doc(xs:string($uri)))}</content>),
-    
-    let $links := merge-txt:get-hyperlinks($col)
-    let $schema-for := $links[1]/tokenize(@path,'/')[2] (: want school-booking from /school-booking/path/to/field :)
-    let $log := util:log("warn", "CREATED SOMTIHNG in " || $col || " for " || $schema-for)
-    return xmldb:store($col,"links.xml",<links template-type='txt'>{attribute for {$schema-for}}{$links}</links>)
+    merge-txt:update-links($col)
+};
+
+declare function merge-txt:update-links($col) {
+    let $all-placeholders-from-template := merge-txt:get-hyperlinks($col)    
+    let $updated-links := links:update-links-doc($col, $all-placeholders-from-template, 'txt')
+    return xmldb:store($col,"links.xml",$updated-links)
+};
+
+declare function merge-txt:replace-links($col) {
+    if (doc-available(xs:anyURI($col || '/links.xml'))) then xmldb:remove($col,'links.xml') else (),
+    merge-txt:update-links($col)
 };
 
 
 declare function merge-txt:get-hyperlinks($col) {
     let $content := doc($col || "/content.xml")/content/text()
     for $x in tokenize($content, "\n")
-    return links:make-link($x)
+    return $x
 };
 
 declare function merge-txt:transform($data) {
@@ -47,5 +54,5 @@ declare function merge-txt:merge($intermediate, $template-file,$job-id) {
     let $new-fn := concat("text-",$job-id,".txt")
     let $merged := merge-txt:transform($intermediate)
     let $header :=  response:set-header('Content-disposition', concat('attachment; filename=',$new-fn))
-    return response:stream-binary(util:string-to-binary($merged),"text/plain")
+    return util:string-to-binary($merged)
 };

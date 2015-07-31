@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns="http://www.ietf.org/rfc/rcf2445.txt" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ical="http://www.ietf.org/rfc/rfc2445.txt" xmlns:itip="http://www.ietf.org/rfc/rfc2446.txt" version="2.0">
+<xsl:stylesheet xmlns="http://www.ietf.org/rfc/rcf2445.txt" xmlns:itip="http://www.ietf.org/rfc/rfc2446.txt" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ical="http://www.ietf.org/rfc/rfc2445.txt" version="2.0">
     <!-- ======================================================================== -->
     <!-- xcal2ics.xsl XSL transformation of xCalendar documents to iCalendar file -->
     <!-- Tim Hare, April 2004                                                     -->

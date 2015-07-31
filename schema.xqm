@@ -21,7 +21,7 @@ declare variable $pekoe-schema:common := "/db/pekoe/common/schemas";
 
 
 :)
-
+(:
 declare
 %rest:GET
 %rest:path("/pekoe/schema/{$for}")
@@ -35,7 +35,7 @@ function pekoe-schema:get-schema($for) {
         then  $local-schema
         else 
             let $default-schema := collection($pekoe-schema:common)/schema[@for eq $for]
-(:            let $log := util:log("debug", "SCHEMA FOR " || $for || " is " || $default-schema):)
+(\:            let $log := util:log("debug", "SCHEMA FOR " || $for || " is " || $default-schema):\)
             return
                 if (not(empty($default-schema))) then $default-schema
                 else                
@@ -43,7 +43,7 @@ function pekoe-schema:get-schema($for) {
                      <http:response status="{$pekoe-http:HTTP-404-NOTFOUND}"/>
                  </rest:response>
 
-};
+};:)
 
 (: Rather than having to create a list of paths every time, why don't I store them somewhere? Config? Next to the schema?
 :)
@@ -51,8 +51,8 @@ function pekoe-schema:get-schema($for) {
 declare 
 function pekoe-schema:make-paths($link-path, $pekoe-schema) {
     
-    for $f in $pekoe-schema/schema/(field,fragment-ref)[starts-with(@path,'/')]
-(:    order by $f:)
+    for $f in $pekoe-schema/(field,fragment-ref)[starts-with(@path,'/')]
+
     let $path := string($f/@path)
     let $full-path := $link-path || $path
     let $outputs := $f/output[@name ne '']
@@ -66,13 +66,7 @@ function pekoe-schema:make-paths($link-path, $pekoe-schema) {
     
 };
 
-(: ************************* List the fields in the selected schema **************** :)
-(:I don't know how to do this for 'common' schemas. Perhaps it doesn't matter. :)
-   let $path := request:get-parameter("path","")
-   let $real-path := $pekoe-schema:tenant-path || $path
-(:   let $local-path := substring-after($real-path, "/db/pekoe/tenants")
-   let $tenant-name := tokenize($local-path,"/")[1]:)
-   let $schema := doc($real-path)
+declare function pekoe-schema:schema-page($schema) {
    let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant || $schema/@for
 
    let $page := 
@@ -81,6 +75,7 @@ function pekoe-schema:make-paths($link-path, $pekoe-schema) {
            <div class='btn-toolbar' role='toolbar' aria-label="List controls">        </div>
        </div>
        <h1>Paths in the schema for {$schema/schema/string(@for)}</h1>
+         <div>Path to schema : {document-uri(root($schema))}</div>
        <div>Note: <em>the links are not active</em>. Right-click on them to copy and then paste into your template as a Hyperlink.</div>
        <table class='table'>
            <tr>
@@ -91,10 +86,54 @@ function pekoe-schema:make-paths($link-path, $pekoe-schema) {
        </div>
    let $results := map {
            'title' := "Schema paths",
-           'path' := $path,
+           'path' := '',
            'body' := $page,
            'pagination' := (),
-           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xqm?path=', $path)
+           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xqm', '')
            }
     return
    list-wrapper:wrap($results)
+};
+
+declare function pekoe-schema:available-schemas() {
+    collection("/db/pekoe/common/schemas")/schema,collection($pekoe-schema:tenant-path)/schema
+};
+
+declare function pekoe-schema:list-schemas() {
+
+   let $page := 
+     <div class='container-fluid'>
+       <div class='row'>
+           <div class='btn-toolbar' role='toolbar' aria-label="List controls">        </div>
+       </div>
+       <h1>Available schemas for {$pekoe-schema:tenant}</h1>
+      
+       <table class='table'>
+           <tr>
+               <th>Schema doctype</th><th>&#160;</th>
+           </tr>
+               { for $schema in pekoe-schema:available-schemas()
+                let $doctype := $schema/data(@for)
+                return <tr><td><a href='?for={$doctype}'>{$doctype}</a></td></tr>
+                }
+           </table>
+       </div>
+   let $results := map {
+           'title' := "Schema paths",
+           'path' := '',
+           'body' := $page,
+           'pagination' := (),
+           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xqm', '')
+           }
+    return
+   list-wrapper:wrap($results)
+};
+
+(: ************************* List the schemas and then their fields and outputs in the selected schema **************** :)
+
+   let $for := request:get-parameter("for","")
+    let $available := pekoe-schema:available-schemas()
+   let $schema := $available[@for eq $for]
+   return if (exists($schema)) then pekoe-schema:schema-page($schema) else pekoe-schema:list-schemas()
+   
+   

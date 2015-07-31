@@ -137,12 +137,13 @@ declare function lw:wrap($content) {
             <button id='openItemTab' type='button' class='btn p-needs-selection btn-default'><i class='glyphicon glyphicon-share-alt'></i>Open in new tab</button> 
             <button id='refresh' type='button' class='btn btn-default'><i class='glyphicon glyphicon-refresh'></i>Refresh</button>  
         </div>
-        
+        <div class='pull-left' style='margin-left:1em'>{$content('pagination')}</div>
     </div>
 
 <div class='table-responsive'>
+
 {$content('body')}
-{$content('pagination')}
+
 </div>
 </body>
 </html>

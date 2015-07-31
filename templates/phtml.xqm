@@ -1,6 +1,6 @@
 (: Manage HTML documents. :)
 xquery version "1.0";
-module namespace phtml = "http://www.gspring.com.au/pekoe/templates/pekoe-html";
+module namespace phtml = "http://www.gspring.com.au/pekoe/merge/pekoe-html";
 
 declare function phtml:extract-placeholder-names($doc) {
     for $n in $doc//*[contains(@class , 'pekoe-ph')]

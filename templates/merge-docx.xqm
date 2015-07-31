@@ -57,14 +57,14 @@ declare variable $docx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.or
     <!-- process a TABLE ROW containing at least one pekoe-hyperlink        
 
     -->
-    <xsl:template match="w:tr[w:tc/*/a]">
+    <xsl:template match="w:tr[.//*:a]">
         <!-- 
             Aim here is to copy the tr for each repetition of the value in the first field. 
             Sounds confusing - but it's simple enough. We want a table, so the number of values in the first field determines the 
             number of rows. 
             (The first field doesn't have to be in the first column of the table.)                    
         -->
-        <xsl:variable name="first-field" select="(.//a)[1]/@href/string(.)" /> <!-- must be a better way to get the mergefield name. -->
+        <xsl:variable name="first-field" select="(.//*:a)[1]/@href/string(.)" /> <!-- must be a better way to get the mergefield name. -->
         <xsl:variable name="row-count" select="count($phlinks/link[@original-href eq $first-field]/*)" /> <!-- what if it's ZERO ???? -->
         <xsl:variable name="this-row" select="." />
         
@@ -91,16 +91,14 @@ Hyperlinks in the word document have been replaced by <a href='...'>Replace Me</
     <xsl:template match="*:a">
         <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
         <xsl:variable name="href" select="@href" />
-       <w:r>            
-            <w:t><xsl:choose>
+       <xsl:choose>
                 <xsl:when test="$index eq 0">
                     <xsl:value-of select="$phlinks/link[@original-href eq $href]/string(.)" />
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:value-of select="($phlinks/link[@original-href eq $href]/*)[$index]/string(.)" />
                 </xsl:otherwise>
-            </xsl:choose></w:t>
-        </w:r>
+            </xsl:choose>
     </xsl:template>
     
     <xsl:template match='node() | @*' mode='delete'/>
@@ -114,9 +112,21 @@ Hyperlinks in the word document have been replaced by <a href='...'>Replace Me</
 declare function docx:extract-content($uri,$col) {
     xmldb:store($col,"word-links.xml",zip:xml-entry($uri, "word/_rels/document.xml.rels")),
     docx:store-modified-content($uri,$col),
-    let $links := docx:get-hyperlinks($col)
-    let $schema-for := $links[1]/tokenize(@path,'/')[2] (: want school-booking from /school-booking/path/to/field :)
-    return xmldb:store($col,"links.xml",<links template-type='docx'>{attribute for {$schema-for}}{attribute mod-datetime {current-dateTime()}}{$links}</links>)
+    docx:update-links($col)
+    };
+
+
+declare function docx:update-links($col) {
+    let $placeholders := distinct-values(doc($col || "/content.xml")//a/@href)
+    let $updated-links := links:update-links-doc($col, $placeholders, 'docx')
+    return xmldb:store($col, "links.xml", $updated-links)
+
+
+};
+
+declare function docx:replace-links($col) {
+    if (doc-available(xs:anyURI($col || '/links.xml'))) then xmldb:remove($col,'links.xml') else (),
+    docx:update-links($col)
 };
 
 
@@ -127,10 +137,10 @@ declare function docx:store-modified-content($uri,$col){
     return xmldb:store($col, "content.xml", $transformed)
 };
 
-declare function docx:get-hyperlinks($col) {
+(:declare function docx:get-hyperlinks($col) {
     for $a in distinct-values(doc($col || "/content.xml")//a/@href)
     return links:make-link($a)
-};
+};:)
 
 
 

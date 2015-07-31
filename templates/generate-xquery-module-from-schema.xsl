@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xso="dummy" exclude-result-prefixes="xd" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" exclude-result-prefixes="xd" version="2.0">
     <xsl:output indent="no" media-type="application/xquery" method="text"/>
     <xd:doc scope="stylesheet">
         <xd:desc>
@@ -41,9 +41,9 @@ It's doesn't affect the template.xql.
         </xd:desc>
     </xd:doc>
     <xsl:variable name="schema-root" select="string(/schema/@for)"/><!-- functions are in the namespace of the schema-root -->
-    <xsl:template match="/schema">
+    <xsl:template match="/schema">xquery version "3.0";
 module namespace ps="http://www.gspring.com.au/schema-module/<xsl:value-of select="$schema-root"/>";
-import module namespace pekoe="http://www.gspring.com.au/pekoe" at "xmldb:exist://db/apps/pekoe/pekoe-resources/common.xqm";
+import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions" at "xmldb:exist://db/apps/pekoe/templates/common-output-functions.xqm";
 <xsl:apply-templates/>
     </xsl:template>
     
@@ -61,11 +61,22 @@ import module namespace pekoe="http://www.gspring.com.au/pekoe" at "xmldb:exist:
         
         But this is going to be hard to make and explain.
                 
+        FIELD-CHOICE (OR choice ELEMENT):
+        Given something like
+        <choice path='/member/company-or-person'>
+            <fragment-ref path='/member/company'...
+            <fragment-ref path='/member/person'...
+            <output name='title-for-mailing'
+            
+                ... Need to pass /member/(company|person) to the GENERATED Output function
+        declare function ps:title-for-mailing($path) 
+        OR In the merge function generator
+        let $context := ...
+        ps:title-for-mailing($context)
         -->
-    <xsl:template match="output[string(xpath) ne '']">
-declare function ps:<xsl:value-of select="string(./@name)"/> ($path) {
-<!--  <xsl:value-of select="string(xpath)"/>  This doesn't work because it won't copy elements (which are needed for tables) -->
-        <xsl:copy-of select="./xpath/(* | text())"/>
+    <xsl:template match="output[@name and xpath/text()]">
+declare function ps:<xsl:value-of select="string(@name)"/> ($path) {
+        <xsl:copy-of select="./xpath/(* | text())"/> 
 };
     </xsl:template>
     

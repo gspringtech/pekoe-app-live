@@ -82,18 +82,23 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
             Aim here is to copy the tr for each repetition of the value in the first field. 
             We want a table, so the number of values in the first field determines the number of rows. 
         -->
-        <xsl:variable name="first-field" select="(.//text:a)[1]/@xlink:href" /> 
-        <xsl:message>Hello first-field: <xsl:value-of select='$first-field'/></xsl:message>
+        <xsl:variable name="first-field" select="(.//text:a)[1]/@xlink:href" />         
         <xsl:variable name="row-count" select="count($phlinks/link[@original-href eq $first-field]/*)" /> <!-- what if it's ZERO ???? -->
+        <xsl:message>FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:message><!-- appears in the wrapper log -->
         <xsl:variable name="this-row" select="." />
         
-        <xsl:if test="$row-count eq 0 and $phlinks/link[@original-href eq $first-field] ne ''" > <!-- handle the case where there is no child element, only a value -->
-            <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="0" as="xs:integer" tunnel="yes" /></xsl:apply-templates>
-        </xsl:if>
-        
-        <xsl:for-each select="1 to $row-count"><!-- context is now the index number - hence the use of a variable in the select...  -->
-            <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="." as="xs:integer" tunnel="yes" /></xsl:apply-templates> 
-        </xsl:for-each>
+        <xsl:choose>
+            <xsl:when test="$row-count eq 0">
+                <xsl:message>ROW COUNT ZERO: <xsl:value-of select='substring-after($first-field,"http://pekoe.io/")'/></xsl:message><!-- appears in the wrapper log -->
+                <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="0" as="xs:integer" tunnel="yes" /></xsl:apply-templates>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:for-each select="1 to $row-count"><!-- context is now the index number - hence the use of a variable in the select...  -->
+                    <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="." as="xs:integer" tunnel="yes" /></xsl:apply-templates> 
+                </xsl:for-each>        
+            </xsl:otherwise>
+        </xsl:choose>
+       
     </xsl:template>
     
     <!-- table-cells behave like spreadsheets. the @value of the cell is used - regardless of the text - when the type is not string. 
@@ -109,6 +114,7 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
 
     
     <xsl:template match="table:table-row" mode="copy">     
+        <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
         <xsl:copy>
             <xsl:apply-templates  mode="#default" />
         </xsl:copy>
@@ -117,17 +123,21 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
 <!-- Replace a hyperlink by its content
   <text:a xlink:type="simple" xlink:href="http://pekoe.io/bkfa/member/person?output=first-and-last">Joe Bloggs</text:a>
  
+ I'm getting extra whitespace because the href is 
     -->
 
     <xsl:template match="text:a">
         <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
         <xsl:variable name="href" select="@xlink:href" /> 
+        <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />
         <xsl:choose>
             <xsl:when test="$index eq 0">
-                <xsl:value-of select="$phlinks/link[@original-href eq $href]/string(.)" />
+                <xsl:message>zero</xsl:message>
+                <xsl:value-of select="$link/string(.)" />
             </xsl:when>
             <xsl:otherwise>
-                <xsl:value-of select="($phlinks/link[@original-href eq $href]/*)[$index]/string(.)" />
+                <xsl:message>not zero - <xsl:value-of select="$index" /></xsl:message>
+                <xsl:value-of select="($link/*)[$index]/string(.)" />
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
@@ -144,12 +154,25 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
 (: --------------- Extract Content and links from ODT ------------------------ :)
 
 declare function odt:extract-content($uri,$col) {
-(:    xmldb:store($col, "content.xml", zip:xml-entry($uri, "content.xml")),:)
     odt:store-modified-content($uri,$col),
-    let $links := odt:get-hyperlinks($col)
-    let $schema-for := $links[1]/tokenize(@path,'/')[2] (: want school-booking from /school-booking/path/to/field :)
-    return xmldb:store($col,"links.xml",<links template-type='odt'>{attribute for {$schema-for}}{$links}</links>)
+    odt:update-links($col)
 };
+
+declare function odt:update-links($col) {
+    let $all-placeholders-from-template := distinct-values(doc($col || "/content.xml")//t:a/@xlink:href[starts-with(., "http://pekoe.io/")])
+    let $updated-links := links:update-links-doc($col, $all-placeholders-from-template, 'odt')
+    return xmldb:store($col,"links.xml",$updated-links)
+};
+
+
+(: If the create-links function is modified, will need to run this :)
+declare function odt:replace-links($col) {
+    (:  links:update-links-doc WON'T replace existing links - it will only add new ones or remove them if they're not in the Template. 
+        To make a clean sweep, need to remove them first. :)
+    if (doc-available(xs:anyURI($col || '/links.xml'))) then xmldb:remove($col,'links.xml') else (),
+    odt:update-links($col)
+};
+
 
 declare function odt:store-modified-content($uri,$col){
     let $content := zip:xml-entry($uri, "content.xml")
@@ -157,17 +180,7 @@ declare function odt:store-modified-content($uri,$col){
     return xmldb:store($col, "content.xml", $transformed)
 };
 
-declare function odt:get-hyperlinks($col) {
-    for $x in distinct-values(doc($col || "/content.xml")//t:a/@xlink:href[starts-with(., "http://pekoe.io/")])
-    return links:make-link($x)
-(:    let $tenant-link := substring-after($x, "http://pekoe.io/")   (\:  bgaedu/school-booking/school/teacher?output=name  :\)
-    let $tenant := substring-before($tenant-link,'/') (\: 'bgaedu' or 'common':\)
-    let $full-link := substring-after($tenant-link,$tenant) (\: /school-booking/school/teacher?output=name :\)
-    let $link := substring-before($full-link,'#')
-    let $output := substring-after($full-link,"#")
-    
-    return if (normalize-space($link) ne '') then  <link>{attribute for {$tenant}}{attribute path {$link}}{attribute output {$output}}</link> else ():)
-};
+
 
 (:<text:a xlink:type="simple"
           xlink:href="http://pekoe.io/tdbg/school-booking/day?output=first-visit-date"
@@ -175,11 +188,6 @@ declare function odt:get-hyperlinks($col) {
 :)
 
 (: --------------- Extract placeholders from ODT ------------------------ :)
-
-declare function odt:extract-placeholder-names($doc) {
-    for $n in $doc//t:placeholder
-    return $n/@t:description               
-};
 
 (: --------------------------------------- MERGE odt --------------------------------------:)
 
@@ -201,14 +209,11 @@ declare function odt:merge($intermediate, $template-bundle-path, $template-file-
 
     let $template-content := $template-bundle-path || "/content.xml"
     
-(:    let $optinos := util:declare-option("exist:serialize","method=xml indent=no omit-xml-declaration=yes"):)
-
     let $merged := transform:transform($intermediate, $odt:stylesheet, 
         <parameters>
             <param name="template-content">{attribute value {$template-content}}</param>
             </parameters>) 
     let $binary-form := util:string-to-binary(util:serialize($merged, "method=xml"))
     let $path-in-zip := 'content.xml' (: Which file in the odt are we replacing. :)
-(:    let $binary-doc := util:binary-doc($template-file) (\: this is the template ZIP :\):)
     return if ($merged instance of element(error)) then $merged else zip:update($template-file-uri, $path-in-zip, $binary-form)
 };

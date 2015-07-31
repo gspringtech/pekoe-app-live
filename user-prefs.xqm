@@ -1,4 +1,6 @@
 xquery version "3.0";
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+
 (:
 
 There are some basic advantages in using JSON - it's simply much easier to integrate with a Javascript front end like Angular.
@@ -67,6 +69,7 @@ import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm
 
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 
+
 (: If you get here and there's no subdomain that's an error.
     BUT - this makes it hard to test outside of the Request.
 :)
@@ -74,11 +77,17 @@ declare variable $prefs:selected-tenant := req:header("tenant");
 declare variable $prefs:tenant-path := "/db/pekoe/tenants/" || $prefs:selected-tenant ;
 declare variable $prefs:config-collection-name := $prefs:tenant-path || "/config/users";
 declare variable $prefs:user := sm:id()//sm:real/sm:username/text();
-declare variable $prefs:admin-group := "pekoe-tenant-admins";
+declare variable $prefs:admin-group := "pekoe-tenant-admins";                                                       (: Awkward - but necessary. Members of <tenant>_admin should also belong to this group. OR MAYBE NOT:)
 declare variable $prefs:user-is-admin := sm:is-dba($prefs:user) or sm:id()//sm:real//sm:group = $prefs:admin-group;
 declare variable $prefs:default-prefs := collection( $prefs:config-collection-name )/config[@for eq 'default'];
 declare variable $prefs:user-prefs := collection( $prefs:config-collection-name )/config[@for eq $prefs:user];
-declare variable $prefs:admin-prefs :=  collection($prefs:config-collection-name )/config[@for eq $prefs:selected-tenant || "_admin"];
+declare variable $prefs:tenant-admin := $prefs:selected-tenant || "_admin";                                         (: Unless I make it a setting - tested using this group :)
+(:declare variable $prefs:admin-prefs :=  collection($prefs:config-collection-name )/config[@for eq $prefs:tenant-admin];:)
+declare variable $prefs:all-prefs :=     doc('/db/pekoe/common/common-bookmarks.xml')//item;
+declare variable $prefs:admin-prefs :=   $prefs:all-prefs except $prefs:all-prefs[@for eq 'dba'];
+declare variable $prefs:common-prefs :=  $prefs:admin-prefs except $prefs:admin-prefs[@for eq $prefs:admin-group];
+
+
 
 (: RESTXQ doesn't provide mch help with errors. I had accidently created two functiions with the same name and arity. :)
 
@@ -147,15 +156,12 @@ declare function prefs:get-bookmarks() {
 };:)
 
 declare function prefs:get-bookmarks() {
-(:    prefs:get-pref('bookmarks'):)
-    
-    let $log := util:log('warn',sm:id())
+    let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP'))
     let $user-bookmarks := prefs:get-pref('bookmarks')
-    
-    let $admin-bookmarks := if ($prefs:user-is-admin) then $prefs:admin-prefs/pref[@for eq 'bookmarks'] else ()
-    let $log := util:log("debug", 'USE ADMIN BOOKMARKS >>>>>>>>>>>>>> ?' || $prefs:user-is-admin)
-    let $log1 := util:log('debug', $admin-bookmarks)
-    return <pref for='bookmarks' tenant='{$prefs:selected-tenant}'>{$user-bookmarks/group,$admin-bookmarks/group}</pref>
+    let $common-prefs := if (sm:is-dba($prefs:user)) then $prefs:all-prefs else if ($prefs:user-is-admin) then $prefs:admin-prefs else $prefs:common-prefs
+
+    return <pref for='bookmarks' tenant='{$prefs:selected-tenant}'>{$user-bookmarks/group,<group type="locked">
+            <title>Pekoe</title>{$common-prefs}</group>}</pref>
 };
 
 declare function prefs:get-pref($for) {

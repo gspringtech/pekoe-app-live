@@ -131,7 +131,7 @@ declare function pqt:year-month-file-path($prefix, $id) {
 };
 
 (: Produce '2012/06/booking-000273' from 'booking', '000273' and today's date :)
-declare function pqt:year-month-with-id-as-path($prefix, $id) {
+declare function pqt:year-month-with-id-as-path($prefix, $id) as xs:string {
     let $currentD := current-date()
     return 
         concat (

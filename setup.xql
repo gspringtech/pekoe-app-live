@@ -17,6 +17,7 @@ import module namespace tenant = "http://pekoe.io/tenant" at '/db/apps/pekoe/ten
  : All resources belonging to a tenant are owned by the <tenant>_staff user, and have r--r----- mode.
  : These resources are "closed-and-available". 
  : When a User opens a resource for editing, the user becomes the owner and the mode changes to rwxr-----.
+ : 
  :  :)
 
 (:
@@ -55,6 +56,8 @@ declare function local:common-schemas() {
   return sm:get-permissions($path)
 };
 
+
+
 (: MUST INSTALL THE TRIGGER FOR TEMPLATES !!!!:)
 
 (:tenant:create('bkfa','Birthing Kit Foundation Australia'):)
@@ -71,7 +74,7 @@ declare function local:common-schemas() {
  
 (: local:common-schemas():)
 (: local:fix-collection-and-resource-permissions('/db/apps/pekoe/tenant-template','pekoe-tenants'):)
- local:fix-collection-and-resource-permissions('/db/pekoe/tenants/cm','cm_staff')
+ local:fix-collection-and-resource-permissions('/db/pekoe/tenants/bkfa/files/assemblers/original','bkfa_staff')
 (:tenant:fix-ownership('/db/pekoe/tenants/cm', 'cm_staff'):)
  
  

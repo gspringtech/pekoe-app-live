@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:school-booking="school-booking" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:pekoe="http://www.gspring.com.au/pekoe" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:pekoe="http://www.gspring.com.au/pekoe" xmlns:school-booking="school-booking" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="2.0">
     <xsl:include href="/db/pekoe-system/common.xsl"/>
     <xsl:function name="school-booking:address-on-one-line">
         <xsl:param name="path"/>

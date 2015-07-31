@@ -48,8 +48,6 @@ function pekoe-schema:get-schema($for) {
 :)
 (: Probably should use the schema path to determine the 'tenant' because it could be a 'common' schema. :)
 declare function pekoe-schema:make-paths($link-path, $pekoe-schema) {
-    let $hide-outputs := request:get-parameter('hide-outputs','') eq '1'
-
     for $f in $pekoe-schema/(field,fragment-ref)[starts-with(@path,'/')]
 
     let $path := string($f/@path)
@@ -57,16 +55,22 @@ declare function pekoe-schema:make-paths($link-path, $pekoe-schema) {
 (:    If this is a fragment-ref then its possible that there are outputs defined on the fragment. 
       These outputs can be overriden by one of the same name defined on the fragment-ref. (The fragment-ref being an "instance".) 
 :)
-(:    let $outputs := $f/output[@name ne '']:)
+
     let $outputs := pekoe-schema:output-functions($f)
-    order by $path
-    return (<tr><td><a href='{$full-path}'>{$path}</a></td><td>{if ($hide-outputs or empty($outputs)) then '...' else '&#160;' }</td></tr>,
-    if ($hide-outputs) then () else
-            for $o in $outputs
-(:            let $output-name := $o/string(@name):)
-            order by $o
-            return <tr><td>&#160;</td><td><a href='{$full-path || '#' || $o}'>{$o}</a></td></tr>
-            )
+(:    order by $path:)
+    return 
+    <tr>
+        <td><a href='{$full-path}'>{$path}</a></td>
+        <td>{if (empty($outputs)) then '&#160;' else  
+            <table class='output'>
+            {for $o in $outputs
+             order by $o
+             return <tr><td><a href='{$full-path || '?output=' || $o}'>{$o}</a></td></tr>
+             }</table>
+             }</td>
+    </tr>
+    
+            
 };
 
 declare function pekoe-schema:output-functions($f) {
@@ -90,47 +94,148 @@ declare function pekoe-schema:field-choice-outputs($f) {
     return $root//fragment[@name eq $frag]/output/string(@name)[. ne '']
 };
 
+declare
+%rest:GET
+%rest:path("/pekoe/schema/{$for}/text")
+%rest:produces("application/xml")
+%output:media-type("application/xml")
+ function pekoe-schema:generate-text-template($for) {
+   let $available := pekoe-schema:available-schemas()
+   let $schema := $available[@for eq $for][1]
+   return
+    <text>
+    {attribute created-dateTime {current-dateTime()} }
+    <content>{
+    for $f at $i in $schema/(field,fragment-ref)[starts-with(@path,'/')]
+    return concat('{{f',$i,'}}&#10;')
+    }</content>
+    {
+    for $f at $i in $schema/(field,fragment-ref)[starts-with(@path,'/')]
+    return <link><placeholder>f{$i}</placeholder><path>http://pekoe.io/{$pekoe-schema:tenant}{$f/@path/string()}</path></link>
+    }
+    </text>
+(:
+Want this
+<text created-dateTime="2015-05-11T09:39:44.867+09:30" created-by="admin" edited="2015-05-11T00:09:52.215Z">
+    <content>Pekoe DOCUMENTATION Item {{id}}
+Title: {{title}}
+Applicable to: {{applies-to}}.
 
-declare function pekoe-schema:schema-page($schema) {
+{{content}}
+</content>
+    <link>
+        <placeholder>title</placeholder>
+        <path>http://pekoe.io/common/documentation/title?uppercase</path>
+    </link>
+    <link>
+        <placeholder>id</placeholder>
+        <path>http://pekoe.io/common/documentation/id</path>
+    </link>
+    <link>
+        <placeholder>applies-to</placeholder>
+        <path>http://pekoe.io/common/documentation/applies-to</path>
+    </link>
+    <link>
+        <placeholder>content</placeholder>
+        <path>http://pekoe.io/common/documentation/content?limit-to-80</path>
+    </link>
+</text>
+
+from this (not from the same schema - but the point is clear )
+http://pekoe.io/bkfa/ad-booking/id
+http://pekoe.io/bkfa/ad-booking/ad-date
+http://pekoe.io/bkfa/ad-booking/earliest-date
+http://pekoe.io/bkfa/ad-booking/org/@id
+http://pekoe.io/bkfa/ad-booking/org
+http://pekoe.io/bkfa/ad-booking/note
+http://pekoe.io/bkfa/ad-booking/address
+http://pekoe.io/bkfa/ad-booking/form-received-date
+http://pekoe.io/bkfa/ad-booking/pre-ad-letter
+http://pekoe.io/bkfa/ad-booking/coordinator
+http://pekoe.io/bkfa/ad-booking/kits/promised
+http://pekoe.io/bkfa/ad-booking/kits/made
+http://pekoe.io/bkfa/ad-booking/kits/returned-date
+http://pekoe.io/bkfa/ad-booking/recurring-booking
+http://pekoe.io/bkfa/ad-booking/in-conjunction-with
+http://pekoe.io/bkfa/ad-booking/theme
+http://pekoe.io/bkfa/ad-booking/heard-of/source
+http://pekoe.io/bkfa/ad-booking/heard-of/other
+http://pekoe.io/bkfa/ad-booking/deliver-to/person
+http://pekoe.io/bkfa/ad-booking/deliver-to/address
+http://pekoe.io/bkfa/ad-booking/supplies
+http://pekoe.io/bkfa/ad-booking/transport-register
+http://pekoe.io/bkfa/ad-booking/email
+http://pekoe.io/bkfa/ad-booking/task
+http://pekoe.io/bkfa/ad-booking/deliver-to/notes
+
+
+
+:)
+
+};
+
+
+declare function pekoe-schema:schema-page($schema,$doctype) {
    let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant 
-
    let $page := 
      <div class='container-fluid'>
        <div class='row'>
            <div class='btn-toolbar' role='toolbar' aria-label="List controls">        </div>
        </div>
-       <h1>Paths in the schema for {$schema/schema/string(@for)}</h1>
+       <h1>Field paths in the <em>{$doctype}</em> schema</h1>
          <div>Path to schema : {document-uri(root($schema))}</div>
        <div>Note: <em>the links are not active</em>. Right-click on them to copy and then paste into your template as a Hyperlink.</div>
-       <div><input type='checkbox' id='hideOutputs'  name='hide-outputs'>{if (request:get-parameter('hide-outputs','') eq '1') then attribute checked {"checked"} else () }</input>Hide outputs
+       <div>
+            <input type='checkbox' id='hideOutputs'  name='hide-outputs'>{if (request:get-parameter('hide-outputs','') eq 'on') then attribute checked {"checked"} else () }</input><label for='hideOutputs'>Hide outputs</label>
+
             <script>$(function(){{
+            // why don't i just hide the rows? much less complex.
                 $('#hideOutputs').on('change',function(){{
-                    var search = location.search.substring(1);
-                    var params = JSON.parse('{{"' + decodeURI(search).replace(/"/g, '\\"').replace(/&amp;/g, '","').replace(/=/g,'":"') + '"}}');
-                    params["hide-outputs"] = $(this).is(':checked') ? '0' : '1';
-                    console.log($.param(params),$(this).is(':checked'));
-                    console.log($.param(params));
-                    //location.search = '?' + $.param(params);
+                   $('.output').toggle();
                 }});
             }});
             </script>
        </div>
        <table class='table'>
-           <tr>
-               <th>Field Path</th><th>&#160;</th>
+        <thead>
+           <tr class='header'>
+               <th>Field Path</th><th>Output functions</th>
            </tr>
+           </thead>
+           <tbody>
                { pekoe-schema:make-paths($link-path, $schema) }
+               </tbody>
            </table>
+           <div>
+{
+
+for $f in $schema/(field,fragment-ref)[starts-with(@path,'/')]
+return <div>{$link-path || $f/@path}</div>
+}
+<a href='/exist/restxq/pekoe/schema/{$schema/@for/string()}/text'>Generate Text Template</a>
+           </div>
        </div>
    let $results := map {
            'title' := "Schema paths",
            'path' := '',
            'body' := $page,
            'pagination' := (),
-           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xqm', '')
+           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xql', '/Schema-paths/' || $doctype)
            }
     return
    list-wrapper:wrap($results)
+};
+
+declare
+%rest:GET
+%rest:path("/pekoe/schemas")
+%rest:produces("application/xml")
+%output:media-type("application/xml")
+ function pekoe-schema:available-doctypes() {
+    for $i in (collection("/db/pekoe/common/schemas")/schema,collection($pekoe-schema:tenant-path)/schema)
+    let $doctype := $i/@for/string()
+    order by $doctype
+    return <doctype>{$doctype}</doctype>
 };
 
 declare function pekoe-schema:available-schemas() {
@@ -147,13 +252,17 @@ declare function pekoe-schema:list-schemas() {
        <h1>Available schemas for {$pekoe-schema:tenant}</h1>
       
        <table class='table'>
-           <tr>
-               <th>Schema doctype</th><th>&#160;</th>
+        <thead>
+           <tr class='header'>
+               <th>Schema doctype</th>               
            </tr>
+           </thead>
+           <tbody>
                { for $schema in pekoe-schema:available-schemas()
                 let $doctype := $schema//string(@for)
                 return <tr><td><a href='?for={$doctype}'>{$doctype}</a></td></tr>
                 }
+                </tbody>
            </table>
        </div>
    let $results := map {
@@ -161,7 +270,7 @@ declare function pekoe-schema:list-schemas() {
            'path' := '',
            'body' := $page,
            'pagination' := (),
-           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xqm', '')
+           'breadcrumbs' := list-wrapper:breadcrumbs('/exist/pekoe-app/schema.xql', '/Schema-paths')
            }
     return
    list-wrapper:wrap($results)
@@ -169,9 +278,10 @@ declare function pekoe-schema:list-schemas() {
 
 (: ************************* List the schemas and then their fields and outputs in the selected schema **************** :)
    
-   let $for := request:get-parameter("for","")
-    let $available := pekoe-schema:available-schemas()
-   let $schema := $available[@for eq $for]
-   return if (exists($schema)) then pekoe-schema:schema-page($schema) else pekoe-schema:list-schemas()
+   let $for := request:get-parameter("for",())
+   let $available := pekoe-schema:available-schemas()
+(:   let $log := util:log('info',$available):)
+   let $schema := $available[@for eq $for][1]
+   return if (exists($schema)) then pekoe-schema:schema-page($schema,$for) else pekoe-schema:list-schemas()
    
    

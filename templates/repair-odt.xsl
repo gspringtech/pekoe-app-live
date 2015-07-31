@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" exclude-result-prefixes="xs" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" exclude-result-prefixes="xs" version="2.0">
+    <xsl:output indent="no"/>
     <!-- 
         Fix problems with ODT templates.
         1/ table-cell with value-type ne string
@@ -36,21 +37,17 @@
         Okay - the second one can be overcome by using a different date format, or putting the date into the hyperlink dialog, 
         but the first one will still happen.
         
+        Here's the current EXAMPLE:
+        <text:p text:style-name="Standard"><text:span text:style-name="T1">Purpose:</text:span><text:a xlink:type="simple"
+            xlink:href="http://pekoe.io/cm/land-division/property/applicant/client?context=receipt[last()]#purpose"
+                ><text:span text:style-name="T1"
+            >applicant-receipt-purpose</text:span></text:a><text:a xlink:type="simple"
+            xlink:href="http://pekoe.io/cm/land-division/property/applicant/client?context=receipt[last()]#purpose"
+                ><text:span text:style-name="T2"> </text:span></text:a></text:p>
+                
+    AND the surprisingly simple solution... check the preceding sibling. If it has the same href, then don't output anything.                
     -->
-    <xsl:template match="text:p[count(text:a) gt 1]">
-        <xsl:variable name="href" select="(text:a)[1]/@xlink:href/string(.)"/>
-        <xsl:choose> <!-- this will be a problem if there is more content in the cell.  -->
-            <xsl:when test="every $a in ./text:a/@xlink:href satisfies $a eq $href">
-                <text:p>
-                    <xsl:copy-of select="@text:style-name"/>
-                    <xsl:copy-of select="(text:a)[1]"/>
-                </text:p>
-            </xsl:when>
-            <xsl:otherwise>
-                <xsl:apply-templates/>
-            </xsl:otherwise>
-        </xsl:choose>
-    </xsl:template>
+    <xsl:template match="text:a[starts-with(./@xlink:href,'http://pekoe.io/') and (preceding-sibling::text:a)[1]/@xlink:href eq ./@xlink:href]"/>
     <xsl:template match="table:table-cell[@office:value-type ne 'string' and exists(.//text:a[starts-with(@xlink:href,'http://pekoe.io')])]">
         <table:table-cell office:value-type="string">
             <xsl:copy-of select="@table:style-name"/>
