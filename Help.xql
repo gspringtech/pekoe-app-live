@@ -10,7 +10,7 @@ declare option output:method "html5";
 declare option output:media-type "text/html";
 
 declare variable $local:collection-path := $tenant:tenant-path || "/files";
-declare variable $local:items := collection($local:collection-path)/documentation;
+declare variable $local:items := (collection($local:collection-path)/documentation, collection('/db/pekoe/common/resources/documentation')/documentation);
 
 declare variable $local:doctype := "documentation";
 
@@ -47,11 +47,13 @@ let $content :=  map:new(($default-content,  map {
     ,
     'doctype' : $local:doctype,
     'row-attributes' : function ($item, $row-data) {
-        let $quarantined-path := substring-after(base-uri($item), $tenant:tenant-path)    
+        let $base-uri := base-uri($item)
+        let $quarantined-path := if (contains($base-uri,'common/resources')) then substring-after($base-uri,'/db/pekoe') else substring-after($base-uri, $tenant:tenant-path)    
         let $safe-path := '/exist/pekoe-files' || $quarantined-path
         return (
         (: Required attributes: class title data-title data-type data-path data-href  :)
         attribute class {'other'},
+        attribute data-original {base-uri($item)},
         attribute title {$safe-path || ' - Documentation'},
         attribute data-title {substring-before(util:document-name($item),'.') || ' documentation'},
         attribute data-type {'report'},

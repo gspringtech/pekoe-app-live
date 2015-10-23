@@ -34,7 +34,7 @@ declare function ods:update-links($col) {
     Currently they are an unnecessary remnant from pekoe 2. Not even sure why I add them to the links.
     
 :)
-    let $updated-links := links:update-links-doc($col, $range-placeholders, 'ods')
+    let $updated-links := links:update-placeholders-doc($col, $range-placeholders, 'ods')
     return xmldb:store($col,"links.xml",$updated-links)
 };
 
@@ -56,7 +56,6 @@ declare function ods:make-link() {
 
 declare function ods:store-modified-content($uri,$col){
     let $content := zip:xml-entry($uri, "content.xml")
-(:  I think I will have to do this...   :)
 (:    let $transformed := transform:transform($content,$odt:repair-odt-stylesheet, ()):)
     let $transformed := $content
     return xmldb:store($col, "content.xml", $transformed)
@@ -247,7 +246,7 @@ Text:
     return 
       $name
 
-};
+}; (: END of process-range2 :)
 
 (: This function :)
 declare function ods:name-and-position($n as element()) as xs:string {
@@ -273,7 +272,8 @@ declare function ods:extract-placeholder-names($doc) {
     (:return $placeholders-range:)
     let $spreadsheet := $doc/. 
     
-    return if(empty($placeholders-range)) then () else (ods:process-range2($placeholders-range, $spreadsheet),ods:process-range($placeholders-range, $spreadsheet))
+    return if(empty($placeholders-range)) then () else ods:process-range2($placeholders-range, $spreadsheet)
+(:    (,ods:process-range($placeholders-range, $spreadsheet)):)
 };
 
 declare function ods:placeholders-list($template) {

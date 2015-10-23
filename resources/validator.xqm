@@ -1,15 +1,9 @@
 module namespace v="http://gspring.com.au/pekoe/validator";
-declare variable $v:schematron-compiler := xs:anyURI("xmldb:exist:///db/apps/pekoe/pekoe-support/iso-schematron-xslt2/iso_svrl_for_xslt2.xsl");
+declare variable $v:schematron-compiler := xs:anyURI("xmldb:exist:///db/apps/pekoe/resources/iso-schematron-xslt2/iso_svrl_for_xslt2.xsl");
 
 
 declare function v:validate($doc as node(), $schematron as xs:anyURI ) {
-    (: Need to compile and store this ...  :)
     let $validator := local:get-compiled-validator($schematron)
-(:            transform:transform(
-                doc($schematron), 
-                $v:schematron-compiler
-                ,()
-                ):)
     return transform:transform(
         $doc,
         $validator,()

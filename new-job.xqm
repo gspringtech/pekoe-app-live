@@ -7,35 +7,74 @@ import module namespace sn="http://gspring.com.au/pekoe/serial-numbers"  at "xml
 
 declare variable $job:doctype := request:get-parameter("doctype", ());
 
+
+(: ****
+    One of the main problems that must be handled is how to create a 'new' with a serial-number, 
+    and then either SAVE it or RELEASE and RETURN/RECYCLE the serial-number. 
+    Alongside this is the desire to standardise the process,
+    and to avoid complex front-end code to handle 'new' vs open/save.
+    
+    When the front-end asks for a 'new' file, we create it, return it and provide a suitable path for it.
+    If the user chooses Save, the file is POSTed back here - and POST means SAVE.
+    The response from the Save is a new Location. Thus the consequent RELEASE will be sent to the resource-manager (via the controller) and NOT THIS FUNCTION.
+    
+    Otherwise, the file is "released" through here - which means RECYCLE the serial number and the data is NOT SAVED.
+    
+    The 'new-path-fn' key in the config can use one of the two provided functions OR override the function
+    job:direct-year-month-path#2    ( YYYY/MM/id.xml)
+    job:bundle-path#2               ( YYYY/MM/id/data.xml )
+    
+   **** :)
+
 declare variable $job:config := map {
-    'save-fn' : job:save#1,
-    'id-fn' : function ($config) { sn:get-next-padded-id($config) },
+    'save-fn'           : job:save#1,
+    'id-fn'             : function ($config) { sn:get-next-padded-id($config) },
     'id-number-picture' : '000000',
-    'id-prefix' : '',
-    'new-fn': job:new#1,
-    'new-path-fn' : job:bundle-path#2 , (: this can be replaced by the other new-path-fn below, or with a custom function :)
-    'get-job-fn' : function ($config, $id) { 
-        error(QName('http://pekoe.io/err', 'JobFnReq'), 'Missing get-job-fn') 
-        },   (: This one must be replaced. :)
-    'item-id-name' : $job:doctype, 
-    'doctype' :      $job:doctype, 
-    'path-to-me' :   "/exist/pekoe-files" || substring-after(request:get-servlet-path(),$tenant:tenant-path)
+    'id-prefix'         : '',
+    'new-fn'            : job:new#1,
+    'new-path-fn'       : job:bundle-path#2 , (: this can be replaced by the other new-path-fn below 'job:direct-year-month-path#2' , or with a custom function :)
+    'get-job-fn'        : function ($config, $id) { error(QName('http://pekoe.io/err', 'JobFnReq'), 'Missing get-job-fn')  },   (: This one must be replaced. :)
+    'item-id-name'      : $job:doctype, 
+    'doctype'           : $job:doctype, 
+    'path-to-me'        : '/exist/pekoe-files' || substring-after(request:get-servlet-path(),$tenant:tenant-path)
     };
     
 
-(: ------------------------------------------------  MAIN FUNCTION --------------------------------------- :)
+(: ------------------------------------------------  MAIN FUNCTION. Save (POST) or 'action' Capture, Release --------------------------------------- :)
 declare function job:process($config as map(*)) {
     if (request:get-method() eq 'POST') then  $config?save-fn($config)
     else
         switch (request:get-parameter('action',''))
-        case "capture" return job:capture($config)
-        case "release" return job:release($config)
-        default return <result status='error'>Unknown action</result>
+        case "capture"  return job:capture($config)
+        case "release"  return job:release($config)
+        default         return <result status='error'>Unknown action</result>
+};
+
+declare function job:capture($config as map(*)) { (: this is a guard for job:new :)
+    response:set-header("Content-type","text/xml"),
+    util:declare-option("exist:serialize", "method=xml media-type=text/xml"),
+    let $id := request:get-parameter("id",())
+    return 
+        if ($id eq "new") 
+        then ($config?new-fn($config)) 
+        else 
+           <result status='fail'>Can't capture {$id} here</result>
+};
+
+declare function job:release($config) {       (:  THIS ONLY APPLIES to NEW Jobs. It should only be called if the job has not been saved.:)
+    let $id := request:get-parameter("id",())
+    let $job := $config?get-job-fn($config, $id)
+    return 
+        if (exists($job)) then (: This should be an error. :)
+            let $job-file := document-uri(root($job))
+            return rp:release-job($job-file)
+        else sn:return($config?item-id-name, $id)
 };
 
 
-(: -----------------  new-path-fn -------------------------------------------------------------------------:)
-(: Use one of these or your own custom file-path function. It should return a path and a data-file-name :)
+(: -----------------  new-path-fn -------------------------------------------------------------------------
+   Use one of these or your own custom file-path function. It should return a path and a data-file-name :)
+   
 declare function job:bundle-path($config, $id) {  (: --------------  This is a "BUNDLE" path - Create a collection named with the job-id in which to store the data.xml :)
     map { 
         'path' : concat( format-date(current-date(),"[Y]/[M01]") , '/' , $id), 
@@ -48,19 +87,6 @@ declare function job:direct-year-month-path($config, $id) { (: ------------- Thi
         'path' :  format-date(current-date(),"[Y]/[M01]"),
         'data-file-name' :    $id || ".xml"
         }
-};
-
-
-
-declare function job:capture($config as map(*)) { (: this is a guard for job:new :)
-    response:set-header("Content-type","text/xml"),
-    util:declare-option("exist:serialize", "method=xml media-type=text/xml"),
-    let $id := request:get-parameter("id",())
-    return 
-        if ($id eq "new") 
-        then ($config?new-fn($config)) 
-        else 
-           <result status='fail'>Can't capture {$id} here</result>
 };
 
 declare function job:new($config as map(*)) {
@@ -97,6 +123,8 @@ declare function job:save($config) {
      (: this is where a file-write should happen - storing the previous version to the file-system. Or other Version Control :)
      
      let $stored := xmldb:store($good-collection, $new-path-map?data-file-name, $data)
+     let $owner := sm:id()//sm:real/sm:username/string()
+     let $chown := sm:chown(xs:anyURI($stored), $owner )
      let $permissions : = sm:chmod(xs:anyURI($stored), $rp:open-for-editing)
      
      let $quarantined-path := "/exist/pekoe-files" || substring-after($stored, $tenant:tenant-path)
@@ -106,29 +134,7 @@ declare function job:save($config) {
         )
 };
 
-    (:
-    NEW is called by capture. 
-    The reason is that PekoeFile is simply calling "Membership.xql?id=new&action=capture"
-    The Controller sees the .xql and passes this to the membership query - ignoring the capture.
-    (this) Membership responds with a generated "member" element containing a new ID.
-    The form is displayed (with a name "New Member")
-    If the user Closes without Saving, PekoeFile calls "membership.xql?id=9&action=release" WITH NO DATA (it's a GET)
-    At this point, the file hasn't been created. release sees empty($job) and so sn:return($config?item-id-name, $id) 
-    IF the user chooses Save, this is a POST to Membership.xql?id=9
-    The POST-handler below is called to create the new file.
-    
-    "new" MUST be done here, because RELEASE without a SAVE must also come here.    
-    :)
 
 
-declare function job:release($config) {       (:  THIS ONLY APPLIES to NEW Jobs. It should only be called if the job has not been saved.:)
-    let $id := request:get-parameter("id",())
-    let $job := $config?get-job-fn($config, $id)
-    return 
-        if (exists($job)) then (: This should be an error. :)
-            let $job-file := document-uri(root($job))
-            return rp:release-job($job-file)
-        else sn:return($config?item-id-name, $id)
-};
 
 

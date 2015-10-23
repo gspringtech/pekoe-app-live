@@ -127,6 +127,7 @@ declare function local:really-lock-file($href, $res) {
 
 declare function local:set-open-for-editing($uri) {
     let $res := rp:resource-permissions($local:path)
+    let $log := util:log('info','SET OPEN FOR EDITING FOR ' || $res?username)
     return    (
     sm:chown($uri,$res?username), 
     (: DON'T CHANGE THE GROUP. The Group determines who can READ the file, which can be different to who can EDIT. :)

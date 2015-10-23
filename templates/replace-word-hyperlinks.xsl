@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:rs="http://schemas.openxmlformats.org/package/2006/relationships" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:doctorx="http://gspring.com.au/pekoe/templates/docxt" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" exclude-result-prefixes="xs xd doctorx rs" version="2.0">
+<xsl:stylesheet xmlns:rs="http://schemas.openxmlformats.org/package/2006/relationships" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:doctorx="http://gspring.com.au/pekoe/templates/docxt" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd doctorx rs" version="2.0">
     <xsl:param name="links-doc"/>
     <xsl:variable name="links" select="doc($links-doc)//rs:Relationship"/>
     <!-- Replace the word hyperlinks with an anchor to make it simple.

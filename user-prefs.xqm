@@ -88,6 +88,25 @@ declare variable $prefs:admin-prefs :=   $prefs:all-prefs except $prefs:all-pref
 declare variable $prefs:common-prefs :=  $prefs:admin-prefs except $prefs:admin-prefs[@for eq $prefs:admin-group];
 
 
+declare
+%rest:GET
+%rest:path('/pekoe/user/screen/{$screen}')
+function prefs:log-screen-size($screen) {
+    util:log('info' , 'SCREEN DATA ' || $screen || ' for USER ' || $prefs:user)
+};
+
+(:
+    Need to add this somewhere:
+    var avail = [screen.availWidth,screen.availHeight].join('x');
+    var screenD = [screen.width,screen.height].join('x');
+    var inner = [window.innerWidth,window.innerHeight].join('x');
+    
+    $.get('/exist/restxq/pekoe/user/screen/' + [avail,screenD,inner].join('_'));
+
+
+:)
+
+
 
 (: RESTXQ doesn't provide mch help with errors. I had accidently created two functiions with the same name and arity. :)
 
@@ -156,7 +175,7 @@ declare function prefs:get-bookmarks() {
 };:)
 
 declare function prefs:get-bookmarks() {
-    let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP'))
+    let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN  TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP'))
     let $user-bookmarks := prefs:get-pref('bookmarks')
     let $common-prefs := if (sm:is-dba($prefs:user)) then $prefs:all-prefs else if ($prefs:user-is-admin) then $prefs:admin-prefs else $prefs:common-prefs
 

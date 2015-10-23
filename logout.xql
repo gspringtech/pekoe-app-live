@@ -60,7 +60,7 @@ declare function local:close-open-files() {
 };
 
 (: pre-validate user to ensure that they are a valid user. :)
-util:log-app('info','login.pekoe.io', $local:current-user || ' LOGGED-OUT OF ' || $local:tenant || ' FROM ' || request:get-header('X-Real-IP')),
+util:log-app('info','login.pekoe.io', '     ' || $local:current-user || ' logged-OUT OF ' || $local:tenant || ' FROM ' || request:get-header('X-Real-IP')),
 local:close-open-files(),
 session:invalidate(),
 <html><head><title>Goodbye</title></head>

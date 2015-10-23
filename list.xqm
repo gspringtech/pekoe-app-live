@@ -30,7 +30,7 @@ module namespace lw = "http://pekoe.io/list/wrapper";
 import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
 import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/apps/pekoe/modules/tenant.xqm";
 
-declare variable $lw:action := request:get-parameter("action","list"); (: Must have useful default for when activated by browse-list:)
+declare variable $lw:action := request:get-parameter("action","List"); (: Must have useful default for when activated by browse-list:)
 declare variable $lw:method := request:get-method();
 
 
@@ -53,6 +53,7 @@ declare variable $lw:base-collection-path := '/files';
 declare function lw:configure-content-map($config-map) {
     (: Must provide defaults for these.   :)
     let $base-map := map {
+        'show-footer' : false(),
         'doctype' : function ($item) { () },                            (: a default returning empty must be provided because it's a function. :)
         'display-title' : function($item) { $item/*[1]/string() }       (: the string-value of the first child element will be the default title of a new Tab for 'this item'. :)
     }
@@ -260,7 +261,7 @@ declare function lw:xpath-search() {
     let $map := lw:parse-xpath($search)
     
     let $xpathsearch := concat("collection('",$colpath,"')", $map?xpath )
-    let $debug := util:log('info','XPATH SEARCH ' || $xpathsearch)
+(:    let $debug := util:log('info','XPATH SEARCH ' || $xpathsearch):)
     let $results  := util:eval($xpathsearch) (: get all the result nodes :)
     return $results    
 };
@@ -342,7 +343,8 @@ declare function lw:pagination-map($content) {
     }
     return map:new(($content, map {'pagination-map': $pages-map}))
 };
-
+(: '/exist/pekoe-app/files.xql?collection=', $lw:quarantined-path e.g. /files/AD-Bookings.xql :)
+(: Note - See Tabular-data.xql for an alternative.   :)
 declare function lw:breadcrumbs($base, $path) {
     let $path-parts := tokenize(substring-after($path,'/'),'/')
     let $last := count($path-parts)
@@ -365,7 +367,8 @@ declare function lw:pagination($pagination-map) {
     let $path-params := if ($p-str ne '') then  $p-str || '&amp;' else ""
     
     return
-    if ($total eq 1) then () 
+    if ($total eq 1) then 
+        <nav><ul class='pagination' style='margin-top:0'><li class='disabled'><a >({$pagination-map?items} items)</a></li></ul></nav>
     else 
         <nav><ul class='pagination' style='margin-top:0'>
             {
@@ -440,14 +443,17 @@ declare function lw:paginate($items) {
 
 declare function lw:get-ordered-items($content as map(*) ) {
     if (map:contains($content, "order-by")) then (
+    
         let $sort-key := substring-after($content?order-by, '-')
         let $direction := substring-before($content?order-by, '-')
         let $order-by-field := map:for-each-entry($content?fields, function ($k,$v) {$v})[?sort-key = $sort-key]
-        return if ($order-by-field instance of map(*) and map:contains($order-by-field,"sort")) then $order-by-field?sort($direction, $content?items)
-        else (
-        util:log('info','%%%%%%%%%%%%%%%%% SORT NOT FOUND sort-key:' || $sort-key || ' direction:' || $direction || ' count:' || count($order-by-field)) ,
-        $content?items
-        )
+        return 
+            if ($order-by-field instance of map(*) and map:contains($order-by-field,"sort")) 
+            then $order-by-field?sort($direction, $content?items)
+            else (
+                util:log('info','%%%%%%%%%%%%%%%%% SORT NOT FOUND in ' || $lw:path-to-me || '. sort-key:' || $sort-key || ' direction:' || $direction || ' count:' || count($order-by-field)) ,
+                $content?items
+                )
     )
     else $content?items
 };
@@ -474,45 +480,19 @@ return
 <html>
 <meta charset="utf-8"></meta>
     <head>
-        <title>{$content('title')}</title>    
-        <script type='text/javascript' src='/pekoe-common/jquery/dist/jquery.js' ></script>
+        <title>{$content('title')}</title>
         <link rel='stylesheet'        href='/pekoe-common/jquery-ui-1.11.0/jquery-ui.css' />
         <link rel='stylesheet'        href='/pekoe-common/dist/css/bootstrap.css' />
         <link rel='stylesheet'        href='/pekoe-common/list/list-items.css' />
         <link rel='stylesheet'        href='/pekoe-common/dist/font-awesome/css/font-awesome.min.css' />
+        <script type='text/javascript' src='/pekoe-common/jquery/dist/jquery.js' ></script>
         <script type='text/javascript' src="/pekoe-common/jquery-ui-1.11.0/jquery-ui.js" ></script>
         <script type='text/javascript' src='/pekoe-common/dist/js/bootstrap.min.js' ></script>
         <script type='text/javascript' src='/pekoe-common/list/pekoe-list-widget.js'></script>
-        {
-        comment {
-        $original-content?path
-        }
-        }
-        {
-        
-        (:
- items
- path-to-me
- path
- custom-script
- search
- column-headings
- row-attributes
- row-function
- breadcrumbs
- custom-row-parts
- doctype
- order-by
- title
- fields
- xpath
- custom-row:)
-        
-        comment {
-            for $k in map:keys($original-content) return concat($k, '&#10;')
+        { comment { 'path:' || $original-content?path } }
+        { comment { 
+            for $k in map:keys($original-content) return concat('&#10;', $k)
         }}
-        
-        
     </head>
 <body>
  <div class='container-fluid'>
@@ -693,6 +673,29 @@ return
             
             }
             </tbody>
+            
+            
+            {
+            (: Two ways to enable/disable... either have a flag like $content?show-footer OR remove the footer from the map - or somehow don't include it.       
+            
+            ALSO
+                it would be great to be able to merge table cells that are empty - using some kind of rule. typically there will only be one or two Grand-Total footer cells - 
+            :)
+            if ($content?show-footer and map:contains($content,'footer')) then 
+            <tfoot>
+            {
+            let $footer-fields := $content?footer
+            return
+            array:for-each($content('column-headings'),function($field) {
+                if (map:contains($footer-fields, $field)) then 
+                
+                 <td>{try { $footer-fields($field)?value($content?items)} catch * { util:log('warn', '****************** FIELD ERROR FOR ' || $field || $err:description ) }}</td>
+                else <td>-no footer for {$field} -</td>
+            })
+            }
+            </tfoot>
+            else ()
+            }
         </table>
 
 }

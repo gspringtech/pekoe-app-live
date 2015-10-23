@@ -25,7 +25,7 @@ function local:login() {
 <h1>Pekoe Login</h1>
   <p>Please login again to Pekoe</p>
   <div>
-                          <form action='/exist/j_security_check'>
+                          <form action='/exist/j_security_check' method='POST'>
                             <input type="text" name="j_username" placeholder="Username" />
                             <input type="password" name="j_password" placeholder="Password" />
                             <input type="submit" value="Login" />

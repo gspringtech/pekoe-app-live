@@ -98,7 +98,7 @@
 	
 	3. This notice may not be removed or altered from any source distribution.
 -->
-<xslt:stylesheet xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:relax="http://relaxng.org/ns/structure/1.0" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:dsdl="http://www.schematron.com/namespace/dsdl" xmlns:crdl="http://purl.oclc.org/dsdl/crepdl/ns/structure/1.0" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" xmlns:sch-check="http://www.schematron.com/namespace/sch-check" xmlns:dtll="http://www.jenitennison.com/datatypes" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0">
+<xslt:stylesheet xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:crdl="http://purl.oclc.org/dsdl/crepdl/ns/structure/1.0" xmlns:sch-check="http://www.schematron.com/namespace/sch-check" xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:relax="http://relaxng.org/ns/structure/1.0" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:dsdl="http://www.schematron.com/namespace/dsdl" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" xmlns:dtll="http://www.jenitennison.com/datatypes" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0">
 	<!-- Note: The URL for the dsdl namespace is not official -->
     <xsl:param name="include-schematron">true</xsl:param>
     <xsl:param name="include-crdl">true</xsl:param>

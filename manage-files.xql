@@ -140,7 +140,9 @@ declare function local:do-delete() {
     return if ($path eq $local:base-collection) then (response:set-status-code(304),response:set-header("Location", request:get-url()))
     else
     let $real-path := $local:tenant-path || $path
-    let $export := system:export-silently($real-path, false(),true())
+(:    let $export := system:export-silently($real-path, false(),true()) 
+    DOCS for this function are wrong and also requires dba. 
+    :)
     let $parent-collection := util:collection-name($real-path)
     let $quarantined := local:quarantined-path($parent-collection)
     let $delete-log:= if (xmldb:collection-available($real-path)) 
@@ -153,30 +155,71 @@ declare function local:do-delete() {
     return (local:redirect-to-browse($quarantined, 'browse','deleted the file'))    
 };
 
+(:
+    The biggest hassle with a BUNDLE is knowing whether the data is IN ONE.
+    A better way to write that is ...
+    
+    So how can I decide if the user is referring to the data of a BUNDLE?
+    - The file name is data.xml
+    - The collection has the same name as the job/id (too hard to check and not guaranteed)
+    - The data file has an attribute (means remembering to include it for every 'new' file)
+    
+    I suppose the first option is the best because I can easily make a RULE that files should only be called 'data.xml' if they're stored in a bundle.
+    (Enforcing that rule is difficult)
+    
+:)
+
+declare function local:trash() {
+    let $path := request:get-parameter("path","")
+    return if ($path eq $local:base-collection) then  (response:set-status-code(304),response:set-header("Location", request:get-url()))
+    else
+    let $real-path := $local:tenant-path || $path
+    let $parent-collection := util:collection-name($real-path)
+    (: First issue - how to handle BUNDLEs    :)
+    (: Second issue - remember to COPY and DELETE - don't use MOVE as its flawed.   :)
+    let $quarantined := local:quarantined-path($parent-collection)
+    let $delete-log:= if (xmldb:collection-available($real-path)) 
+                    then util:log("warn", "GOING TO TRASH COLLECTION (real-path)" || $real-path || " (path)" || $path )
+                    else util:log("warn", "GOING TO TRASH " || util:document-name($real-path) || " FROM COLLECTION " || $parent-collection )
+    let $delete:= if (xmldb:collection-available($real-path)) 
+                    then xmldb:remove($real-path)
+                    else xmldb:remove($parent-collection, util:document-name($real-path))
+                    
+    return (local:redirect-to-browse($quarantined, 'browse','deleted the file'))   
+    
+};
+
+
+
 (:A change-owner or change-group function would be useful. Like 'new' these need params. A modal would be nice. :)
 
-(: BOTH unlock and delete need to have checks to ensure that the user is the correct owner.:)
+(: BOTH unlock and delete need to have checks to ensure that the user is the correct owner.
+    BUT Unlock _should_ only set the file to the 'correct' state - based on the current collection and rules.
+:)
 declare function local:unlock-file() {
     let $path := request:get-parameter("path","") (: /files/schemas/trimmed-txo-schema.xml :)
     return if ($path eq "" ) then (response:set-status-code(304),response:set-header("Location", request:get-uri()))
     else
         let $real-path := $local:tenant-path || $path 
-        let $permissions := rp:resource-permissions($real-path)
-        let $uri := xs:anyURI($real-path)
-(:        let $parent := util:collection-name($real-path):)
-(:        TODO - use mime type and/or check for binary or collection to handle XQuery, Collection or other data types. :)
         let $quarantined := local:quarantined-path(util:collection-name($real-path))
-(:        let $collection-permissions := sm:get-permissions(xs:anyURI($parent)):)
-(:        let $group-owner := $collection-permissions/sm:permission/data(@group):)
-           (:        The file needs to have the same owner and group as its parent-collection. This should be the rule. Thus
-           If the parent-coll is owned by :)
+        return (rp:unlock-file($real-path),local:redirect-to-browse($quarantined, 'browse','UNLOCK FILE COMMAND'))
+        
+(:        let $permissions := rp:resource-permissions($real-path)
+        let $uri := xs:anyURI($real-path)
+(\:        let $parent := util:collection-name($real-path):\)
+(\:        TODO - use mime type and/or check for binary or collection to handle XQuery, Collection or other data types. :\)
+        let $quarantined := local:quarantined-path(util:collection-name($real-path))
+(\:        let $collection-permissions := sm:get-permissions(xs:anyURI($parent)):\)
+(\:        let $group-owner := $collection-permissions/sm:permission/data(@group):\)
+           (\:        The file needs to have the same owner and group as its parent-collection. This should be the rule. Thus
+           If the parent-coll is owned by :\)
         return 
             if (not(doc-available($real-path))) then (local:redirect-to-browse($quarantined, 'browse','could not unlock the file'))
             else (
-            (:util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "rw-r-----"))),:) 
+            (\:util:exclusive-lock(doc($real-path), (sm:chown($uri, $group-owner), sm:chgrp($uri, $group-owner), sm:chmod($uri, "rw-r-----"))),:\) 
             util:exclusive-lock(doc($real-path), (sm:chown($uri, $permissions?col-owner), sm:chgrp($uri, $permissions?col-group), sm:chmod($uri, $rp:closed-and-available))),
             (local:redirect-to-browse($quarantined, 'browse','unlocked the file'))
-            )
+            ):)
 };
 
 declare function local:redirect-to-browse($path, $action,$message) {

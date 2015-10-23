@@ -51,7 +51,7 @@ let $content :=  map:new(($default-content,  map {
     Even variations in presentation of a field can be handled by simply defining a new column-heading and field?name.
 :)
     'column-headings': 
-         ['Applies to', 'File','Report Title','Parameters']
+         ['Report Title', 'Applies to', 'Last Mod', 'File','Parameters']
     ,
     'doctype' : $local:doctype,
     'row-attributes' : function ($item, $row-data) {
@@ -94,6 +94,26 @@ let $content :=  map:new(($default-content,  map {
                 then for $item in $items order by $item/title ascending return $item 
                 else for $item in $items order by $item/title descending return $item 
             }
+        },
+        
+        'Last Mod' : map {
+            'value': function ($item,$row-data) {                
+                pqt:format-as-aust-date(pqt:mod-date($item))
+                },
+            'sort-key' : 'mod-date',
+            'sort' : function ($direction, $items) {
+                
+                if ($direction eq "descending") then
+                      for $item in $items
+                      
+                      order by pqt:mod-date($item) descending
+                      return  $item
+                  else
+                      for $item in $items
+                      order by pqt:mod-date($item) ascending
+                      return  $item
+                     }
+        
         },
         'date example' : map {
             'value': function ($item,$row-data) {                

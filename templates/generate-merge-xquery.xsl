@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- (: Copyright 2012 Geordie Springfield Pty Ltd Australia :) -->
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" exclude-result-prefixes="xs xd" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
     
     <!-- 
             Output functions - discussion: 
@@ -195,12 +195,21 @@ declare function local:collect-values($job) {
             <xsl:apply-templates select="node()"/>
         </xsl:copy>
     </xsl:template>
+    
+    
+    <!-- Create a copy of the LINK, with the appropriate script to generate the output - e.g. 
+            {                    
+            let $var0 := $job/residential/purchaser/person
+            let $var1 := residential:full-name($var0)
+            return $var1
+            }
+    -->
     <xsl:template match="link">
         <xsl:variable name="output-functions" select="count(./output)"/>
         <xsl:variable name="lastOutput" select="concat('$var',$output-functions)"/>
         <link>
             <xsl:apply-templates select="@original-href"/>
-<!-- copy the original link and its attributes - but only really want the original-href -->                
+            <xsl:apply-templates select="@placeholder"/>
         {<xsl:choose>
                 <xsl:when test="empty(./xquery) and $output-functions eq 0"> <!-- this is a value result.  -->
             $job<xsl:value-of select="@field-path"/>

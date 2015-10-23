@@ -64,7 +64,7 @@ declare variable $local:workspace-type := map {
     'report'        : 'report'
 };
 
-declare variable $local:editor-link-protocol := map {'odt' : 'neo', 'ods' : 'neo', 'docx': 'ms-word'};
+declare variable $local:editor-link-protocol := map {'odt' : 'neo', 'ods' : 'neo'};
 
 declare function local:filtered-items() {
     for $c in ($local:all-items)
@@ -104,6 +104,10 @@ declare function local:get-relevant-config() {
 
 (: TODO - collect the common features of the three doctypes ------------------------ TODO :)
 declare function local:common-features($item) {
+    (: TODO - consider whether this is a good place to work out the _type_ of document - e.g. JOB, xql, REPORT, TABULAR-DATA etc - 
+        instead of relying on the file extension.
+        
+   :)
     map {
     
     }
@@ -138,16 +142,57 @@ declare function local:format-collection($common, $item) {
     'owner'   : $smp/@owner/string(),
     'group' : $smp/@group/string(),
     'icon' : $local:type-icon('collection'),
-    'created' : format-dateTime(xmldb:created($local:collection-path),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
+    'created' : format-dateTime(xmldb:created($path),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
     }
 };
 
 declare function local:format-xml($common, $item) {
         
     let $path := $local:collection-path || '/' || $item
+    
+    let $doc := if (doc-available($path)) then doc($path) else ()
+    return if ($doc/*/@tabular-data) then local:tabular-data-file($common, $item, $path, $doc) else 
+    local:format-job-file($common, $item, $path, $doc)
+    
+};
+
+declare function local:tabular-data-file($common, $item, $path, $doc) {
+    let $smp := sm:get-permissions(xs:anyURI($path))/sm:permission  (: <sm:permission owner="tdbg_staff" group="tdbg_staff" mode="r-xr-x---">    :)
     let $safe-path := $local:current-collection || '/' || $item
     let $short-name := substring-before($item,'.')
-    let $doctype := doc($path)/name(*)
+    let $attributes := map { 
+        'title' : $safe-path || ' list',
+        'class' : 'xml',
+        'data-type' : 'report',
+        'data-title' : $short-name,
+        'data-path' : $safe-path,
+        'data-href' : '/exist/pekoe-app/Tabular-data.xql?collection=' || $local:current-collection || '&amp;file=/exist/pekoe-files' || $safe-path 
+        }
+             
+    return map {
+        'path' : $path, 
+        'quarantined-path' : $safe-path,
+        'name' : $short-name,           
+        'attributes' :   $attributes,
+        'icon' : $local:type-icon('xql'),
+        'permissions' : $smp/@mode/string(),
+        'owner'   : $smp/@owner/string(),
+        'group' : $smp/@group/string(),
+        'created' : format-dateTime(xmldb:created($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
+        'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
+        }
+
+};
+
+declare function local:format-job-file($common, $item, $path, $doc) {
+
+
+    let $doctype := $doc/name(*)
+    let $safe-path := $local:current-collection || '/' || $item
+    let $short-name := substring-before($item,'.')
+    
+    
+    return     
     let $permissions := rp:resource-permissions($path)
     let $owner-is-me := $permissions?user-is-owner
     (: Option 1: clicking the TR does nothing - it is disabled (not user-can-edit)
@@ -194,13 +239,14 @@ declare function local:format-xml($common, $item) {
     }
 };
 
+
 declare function local:format-binary($common, $item) {    
     let $path := $local:collection-path || '/' || $item
     let $safe-path := $local:current-collection || '/' || $item
     let $short-name := substring-before($item,'.')
     let $smp := sm:get-permissions(xs:anyURI($path))/sm:permission
     let $extension := substring-after($item, '.')
-    let $edit-link := if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) then $local:editor-link-protocol($extension) || ":https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path else ()
+    let $edit-link := if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) then $local:editor-link-protocol($extension) || ":https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path else '/exist/pekoe-files' || $safe-path
     let $attributes := map { 
         'title' : $safe-path,
         'class' : $extension,
@@ -224,7 +270,8 @@ declare function local:format-binary($common, $item) {
     'group' : $smp/@group/string(),
     'icon' : $local:type-icon($extension),
     'created' : format-dateTime(xmldb:created($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
-    'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
+    'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
+    'admin-link' :  if ($extension eq 'docx') then <a>{attribute href { "ms-word:https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path }}{$item}</a> else ()
     }
 };
 
@@ -241,15 +288,7 @@ declare function local:format-query($common, $item) {
         'data-path' : $safe-path,
         'data-href' : '/exist/pekoe-files' || $safe-path 
         }
-    
-   (: (
-                attribute class {'xql'},
-                attribute title {$safe-path || ' list'},
-                attribute data-title {$short-name},
-                attribute data-type {'report'},
-                attribute data-path {$safe-path},   (\: the resource path - for move/delete/rename :\)
-                attribute data-href {'/exist/pekoe-files' || $safe-path}
-            ) :)           
+             
     return map {
         'path' : $path, 
         'quarantined-path' : $safe-path,
@@ -298,7 +337,7 @@ declare function local:doctype-options() {
 
 
 
-(:  ----------------------------------------------------   MAIN QUERY ---------------------------------------- :)
+
 
 declare function local:date-or-button($field, $action, $path) {
     if ($field castable as xs:date) then $field/format-date(., '[D1]-[MN,*-3]')
@@ -309,6 +348,8 @@ declare function local:value-or-input($field, $action, $path) {
     if ($field ne '') then $field/string()
     else <input type='text' data-action='{$action}' class='value-input' data-path='{$path}' title="press Enter to update"/>
 };
+
+(:  ----------------------------------------------------   MAIN QUERY ---------------------------------------- :)
 
 let $conf := map {
     'doctype' : function ($item) { 'unknown' },
@@ -328,7 +369,7 @@ let $content :=  map:new(($default-content,  map {
     'column-headings': 
         switch ($local:view)
         case 'supplies' return ['AD-Date','Org','Kits', 'Paid?', 'Invoice-number', 'Latest Note']
-        default return ['Name','Permissions','Editors','Viewers','Created','Modified']
+        default return ['Name','Permissions','Editors','Viewers','Created','Modified', if (sm:is-dba(xmldb:get-current-user())) then 'admin-link' else '-']
     ,
     'doctype' : '',
     'row-function' : function ($item) { (: Used to generate the row-data map for each item:)
@@ -378,7 +419,9 @@ let $content :=  map:new(($default-content,  map {
                 then for $item in $items order by xmldb:last-modified($local:collection-path, $item) ascending  return $item 
                 else for $item in $items order by xmldb:last-modified($local:collection-path, $item) descending empty least return $item 
             }
-        }
+        },
+        'admin-link' : map {
+            'value' : function ($row, $row-data) {$row-data?admin-link} }
     }, (: End of fields map :)
     'custom-script' : function ($content) { (: This script will be loaded at the end of the page. :)
         <script>

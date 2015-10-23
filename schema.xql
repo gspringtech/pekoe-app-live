@@ -80,9 +80,9 @@ declare function pekoe-schema:output-functions($f) {
     else 
         let $fragref := string($f/@path)
         let $fragment-name := tokenize($fragref,'/')[last()]
-        let $debug := util:log('debug','WANT OUTPUTS FROM FRAGMENT NAMED ' || $fragment-name)
-        let $fragment-outputs := $f/../fragment[@name eq $fragment-name]/output/string(@name)[. ne '']
-        let $debug := util:log('debug',//fragment[@name eq $fragment-name])
+        
+        let $fragment-outputs := root($f)//fragment[@name eq $fragment-name]/output/string(@name)[. ne '']
+        
         let $frag-ref-outputs := $f/output/string(@name)
         return distinct-values(($fragment-outputs,$frag-ref-outputs)[. ne ''])
 };
@@ -174,7 +174,7 @@ http://pekoe.io/bkfa/ad-booking/deliver-to/notes
 
 };
 
-
+(:  ***************** This is the schema-paths page for a specific schema **************** :)
 declare function pekoe-schema:schema-page($schema,$doctype) {
    let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant 
    let $page := 
@@ -187,22 +187,30 @@ declare function pekoe-schema:schema-page($schema,$doctype) {
        <div>Note: <em>the links are not active</em>. Right-click on them to copy and then paste into your template as a Hyperlink.</div>
        <div>
             <input type='checkbox' id='hideOutputs'  name='hide-outputs'>{if (request:get-parameter('hide-outputs','') eq 'on') then attribute checked {"checked"} else () }</input><label for='hideOutputs'>Hide outputs</label>
-
+            <label style='margin-left: 2em;'>Search field paths: <input type='text' id='filter' size='40'/></label> <button id='clear'>Clear</button>
             <script>$(function(){{
             // why don't i just hide the rows? much less complex.
                 $('#hideOutputs').on('change',function(){{
                    $('.output').toggle();
                 }});
+                $('#clear').click(function () {{ $('#filter').val('');}})
+                $('#filter').keyup(function () {{
+                    var t = $(this).val();
+                    $('#topt > tr').hide();
+                    $('#topt > tr:contains("' + t + '")').show();
+                    $('.textlink').hide();
+                    $('.textlink:contains("' + t + '")').show();
+                }});
             }});
             </script>
        </div>
-       <table class='table'>
+       <table class='table' style='width: 50%'>
         <thead>
            <tr class='header'>
                <th>Field Path</th><th>Output functions</th>
            </tr>
            </thead>
-           <tbody>
+           <tbody id='topt'>
                { pekoe-schema:make-paths($link-path, $schema) }
                </tbody>
            </table>
@@ -210,9 +218,9 @@ declare function pekoe-schema:schema-page($schema,$doctype) {
 {
 
 for $f in $schema/(field,fragment-ref)[starts-with(@path,'/')]
-return <div>{$link-path || $f/@path}</div>
+return <div class='textlink'>{$link-path || $f/@path}</div>
 }
-<a href='/exist/restxq/pekoe/schema/{$schema/@for/string()}/text'>Generate Text Template</a>
+{if (sm:is-dba(sm:id()//sm:username)) then <a href='/exist/restxq/pekoe/schema/{$schema/@for/string()}/text'>Generate Text Template</a> else ()}
            </div>
        </div>
    let $results := map {
@@ -260,6 +268,7 @@ declare function pekoe-schema:list-schemas() {
            <tbody>
                { for $schema in pekoe-schema:available-schemas()
                 let $doctype := $schema//string(@for)
+                order by $doctype
                 return <tr><td><a href='?for={$doctype}'>{$doctype}</a></td></tr>
                 }
                 </tbody>

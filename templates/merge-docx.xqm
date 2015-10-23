@@ -26,6 +26,7 @@ declare variable $docx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.or
             <xd:p/>
         </xd:desc>
     </xd:doc>
+    <xsl:strip-space elements="*" />
     <xsl:param name="template-content" />
     <xsl:variable name="path-to-template-content" select="concat('xmldb:exist://', $template-content )" />
     <xsl:variable name="phlinks" select="/links"/> <!--  a reference to the root is needed because another document is imported. -->
@@ -91,12 +92,13 @@ Hyperlinks in the word document have been replaced by <a href='...'>Replace Me</
     <xsl:template match="*:a">
         <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
         <xsl:variable name="href" select="@href" />
+        <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />
        <xsl:choose>
                 <xsl:when test="$index eq 0">
-                    <xsl:value-of select="$phlinks/link[@original-href eq $href]/string(.)" />
+                    <xsl:value-of select="$link/string(.)" />
                 </xsl:when>
                 <xsl:otherwise>
-                    <xsl:value-of select="($phlinks/link[@original-href eq $href]/*)[$index]/string(.)" />
+                    <xsl:value-of select="if ($link/*) then ($link/*)[$index]/string(.) else $link/string(.)" />
                 </xsl:otherwise>
             </xsl:choose>
     </xsl:template>

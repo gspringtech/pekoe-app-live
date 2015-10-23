@@ -3,6 +3,9 @@ import module namespace tenant = "http://pekoe.io/tenant"                at "xml
 declare %private variable $local:aws_user := environment-variable('AWS_USER');
 declare %private variable $local:aws_pass := environment-variable('AWS_PASS');
 
+(: The solution to the nodeproxy problem is to use util:deep-copy. Not sure if that solves teh other issues. 
+:)
+
 declare variable $local:test-mail := <mail created-dateTime="2015-02-24T18:52:53.709+10:30" created-by="admin">
     <from>alisterhp@mac.com</from>
     <to>
@@ -19,10 +22,6 @@ declare variable $local:test-mail := <mail created-dateTime="2015-02-24T18:52:53
             </html>
         </xhtml>
     </message>
-    <attachment>
-        AD-Reimbursement-2014-0008-20150223.docx
-    </attachment>
-    <attachment>files/Assembly-days/resources/Assembly-Day-Manual-201412.docx</attachment>
 </mail>
 ;
 
@@ -157,7 +156,7 @@ return if (empty($sent))
                if (($job//email)[last()]/sent-date eq '') then (: The User created this Email with an attachment. :)
                     let $email := <email created-by='{$current-username}' created-dateTime='{current-dateTime()}'>
                         <from>{normalize-space($mail-map?mail/from)}</from>
-                        <to>{string-join($mail-map?mail/to,',')}</to>
+                        <to>{string-join(normalize-space($mail-map?mail/to),',')}</to>
                         <sent-date>{$current-date}</sent-date>
                         <template-used>{$template}</template-used>
                         {$job//email[last()]/attachment}
@@ -166,7 +165,7 @@ return if (empty($sent))
                else (: The system is recording that an email was sent. :)
                     let $email := <email created-by='{$current-username}' created-dateTime='{current-dateTime()}'>
                         <from>{normalize-space($mail-map?mail/from)}</from>
-                        <to>{string-join($mail-map?mail/to,',')}</to>
+                        <to>{string-join(normalize-space($mail-map?mail/to),',')}</to>
                         <sent-date>{$current-date}</sent-date>
                         <template-used>{$template}</template-used>
                         </email>

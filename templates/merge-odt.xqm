@@ -3,6 +3,7 @@ xquery version "3.0" encoding "UTF-8";
 :)
 
 module namespace odt="http://www.gspring.com.au/pekoe/merge/odt";
+declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare namespace t="urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 declare namespace xlink="http://www.w3.org/1999/xlink";
 declare copy-namespaces preserve, inherit;
@@ -28,7 +29,8 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
             <xd:p/>
         </xd:desc>
     </xd:doc>
-    <xsl:output method="xml"  cdata-section-elements="" omit-xml-declaration="yes"/>
+    <xsl:strip-space elements="*" />
+    <xsl:output method="xml"  cdata-section-elements="" omit-xml-declaration="no" indent='no'/>
     <xsl:param name="template-content" />
     <xsl:variable name="path-to-template-content" select="concat('xmldb:exist://', $template-content )" />
     <xsl:variable name="phlinks" select="/links"/> <!--  a reference to the root is needed because another document is imported. -->
@@ -81,10 +83,18 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
         <!-- 
             Aim here is to copy the tr for each repetition of the value in the first field. 
             We want a table, so the number of values in the first field determines the number of rows. 
+            
+            NOTE that it's also possible the table has no repeats. 
+            
+            I'm somehow missing a placeholder here.
+            
+            I have two links in this one CELL
+            
+            Also, the formatting is being lost because I'm throwwing away style info.
         -->
         <xsl:variable name="first-field" select="(.//text:a)[1]/@xlink:href" />         
         <xsl:variable name="row-count" select="count($phlinks/link[@original-href eq $first-field]/*)" /> <!-- what if it's ZERO ???? -->
-        <xsl:message>FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:message><!-- appears in the wrapper log -->
+        <xsl:message>TABLE ROW FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:message><!-- appears in the wrapper log -->
         <xsl:variable name="this-row" select="." />
         
         <xsl:choose>
@@ -92,6 +102,7 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
                 <xsl:message>ROW COUNT ZERO: <xsl:value-of select='substring-after($first-field,"http://pekoe.io/")'/></xsl:message><!-- appears in the wrapper log -->
                 <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="0" as="xs:integer" tunnel="yes" /></xsl:apply-templates>
             </xsl:when>
+<!-- The problem occurs when the first field is an element, and the second field is NOT - just a string. -->
             <xsl:otherwise>
                 <xsl:for-each select="1 to $row-count"><!-- context is now the index number - hence the use of a variable in the select...  -->
                     <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="." as="xs:integer" tunnel="yes" /></xsl:apply-templates> 
@@ -110,6 +121,22 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
         
         Also, if the hyperlink is applied to a date in long format, there will be 3 hyperlinks - one for 
         
+        The second field isn't being rendered.
+        
+        <table-cell table:style-name="Table1.A1" office:value-type="string">
+                        <p xmlns="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:style-name="P15">
+                            <a xlink:type="simple" xlink:href="http://pekoe.io/cm/residential/purchaser/person?output=address-after#line1">
+                                <span text:style-name="T6">p-add-line1-after</span>
+                            </a>
+                            <span text:style-name="T6"/>
+                        </p>
+                        <p xmlns="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:style-name="P15">
+                            <a xlink:type="simple" xlink:href="http://pekoe.io/cm/residential/purchaser/person?output=address-after&amp;output=suburb-state-postcode">
+                                <span text:style-name="T6">p-addr-suburb-after</span>
+                            </a>
+                        </p>
+                    </table-cell>
+        
     -->
 
     
@@ -120,39 +147,74 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
         </xsl:copy>
     </xsl:template>
 
+    
+
 <!-- Replace a hyperlink by its content
   <text:a xlink:type="simple" xlink:href="http://pekoe.io/bkfa/member/person?output=first-and-last">Joe Bloggs</text:a>
- 
- I'm getting extra whitespace because the href is 
-    -->
 
-    <xsl:template match="text:a">
+    In some cases, the anchor will contain a styled span. Hopefully nothing else as I'm being specific.
+    I can't work out any better method of handling this other than to have two templates - one for each situation.
+    -->
+    <xsl:template match="text:span[parent::text:a]" mode="inside">
         <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
-        <xsl:variable name="href" select="@xlink:href" /> 
-        <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />
+        <xsl:param name="link" tunnel="yes" />
+        <xsl:copy>
+            <xsl:apply-templates select="@*" />
         <xsl:choose>
             <xsl:when test="$index eq 0">
-                <xsl:message>zero</xsl:message>
                 <xsl:value-of select="$link/string(.)" />
             </xsl:when>
             <xsl:otherwise>
-                <xsl:message>not zero - <xsl:value-of select="$index" /></xsl:message>
-                <xsl:value-of select="($link/*)[$index]/string(.)" />
+                <!-- NOTE: must handle the case where the LINK does NOT contain an ELEMENT (and so $link/*[1] will be meaningless) -->
+                <xsl:value-of select="if ($link/*) then ($link/*)[$index]/string(.) else $link/string(.)" />
             </xsl:otherwise>
         </xsl:choose>
+        </xsl:copy>
     </xsl:template>
-
+    
     <xsl:template match="node() | @*">
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>
         </xsl:copy>
     </xsl:template>
+    
+    <xsl:template match="text:a[text:span]" priority="5">
+      <xsl:param name="index" select="0" tunnel="yes"/>
+      <xsl:variable name="href" select="@xlink:href" /> 
+      <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />      
+      <xsl:apply-templates mode="inside">
+        <xsl:with-param name="index" select="$index" tunnel="yes"/>
+        <xsl:with-param name="link" select="$link" tunnel="yes" />
+      </xsl:apply-templates>
+    </xsl:template>
+    
+
+    <xsl:template match="text:a[not(text:span)]">
+        <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
+        <xsl:variable name="href" select="@xlink:href" /> 
+        <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />
+        
+        <xsl:choose>
+            <xsl:when test="$index eq 0">
+                <xsl:message>TEXT index=zero for field <xsl:value-of select='$href' /></xsl:message>
+                <xsl:value-of select="$link/string(.)" />
+            </xsl:when>
+            <xsl:otherwise>
+                <!-- NOTE: must handle the case where the LINK does NOT contain an ELEMENT (and so $link/*[1] will be meaningless) -->
+                <xsl:message>TEXT index=<xsl:value-of select="$index" /> for field <xsl:value-of select='$href' /></xsl:message>
+                <xsl:value-of select="if ($link/*) then ($link/*)[$index]/string(.) else $link/string(.)" />
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+
 
 </xsl:stylesheet>
 ; (: --------------------- END OF ODT STYLESHEET ------------------:)
 
 (: --------------- Extract Content and links from ODT ------------------------ :)
 
+(: ******** This is called by the template-trigger when a Template is added/modified ********** :)
 declare function odt:extract-content($uri,$col) {
     odt:store-modified-content($uri,$col),
     odt:update-links($col)
@@ -213,7 +275,9 @@ declare function odt:merge($intermediate, $template-bundle-path, $template-file-
         <parameters>
             <param name="template-content">{attribute value {$template-content}}</param>
             </parameters>) 
-    let $binary-form := util:string-to-binary(util:serialize($merged, "method=xml"))
+(:    let $binary-form := util:string-to-binary(util:serialize($merged, "method=xml")):)
+    let $binary-form := util:string-to-binary(serialize($merged, <output:serialization-parameters><output:method value='xml'/><output:indent value='no'/></output:serialization-parameters>))
     let $path-in-zip := 'content.xml' (: Which file in the odt are we replacing. :)
+(:    WHY CAN'T I RUN A FOP - to PDF here? :)
     return if ($merged instance of element(error)) then $merged else zip:update($template-file-uri, $path-in-zip, $binary-form)
 };

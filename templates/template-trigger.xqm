@@ -1,6 +1,5 @@
 xquery version "3.0";
 module namespace tm = "http://pekoe.io/templates/management";
-(:Sadly I have lost a morning's work. I had been importing the merge files. Specifically, I think it was on Owl in Sublime - the templates.xqm :)
 (:
     Module handles activity in the tenant's /templates collection
     after-create-collection - create a matching collection in /templates-meta
@@ -101,9 +100,23 @@ declare function trigger:after-delete-document($uri as xs:anyURI) {
     tm:deleted(string($uri))   
 };
 
-(: This is called when the document is replaced :)
+(: Getting really untidy here. This module needs a rewrite. :)
+declare function tm:bundle-col($path as xs:string) {
+    let $col-path := tm:col-meta-path($path)
+    let $docname := util:document-name($path)
+    let $good-name := tm:good-name($docname)
+    return $col-path || '/' || $good-name
+};
+
+(: This is called when the document is replaced.
+    To make this work, the script changes the owner (to the current user) and mode of the meta-files,
+    then the files are modified, (in 'create') and then finally the owner is returned to _staff and the mode to 'closed-and-available'
+:)
 declare function trigger:after-update-document($uri as xs:anyURI) {
-    tm:log(("AFTER UPDATE DOCUMENT", $uri)),
+(:    tm:log(("AFTER UPDATE DOCUMENT", $uri || ' USER ' || sm:id()//sm:real/sm:username/string() )),:)
+    let $meta-col := tm:bundle-col(string($uri))
+    return tm:unlock-files($meta-col)
+    ,
     tm:created(string($uri))
 };
 
@@ -116,6 +129,8 @@ declare function tm:deleted($path as xs:string) {
     let $good-col := if (xmldb:collection-available($meta-path-to-bundle) and not(ends-with($meta-path-to-bundle, "/templates-meta"))) then xmldb:remove($meta-path-to-bundle) else ()
     return ()
 };
+
+
 
 declare function tm:created($path as xs:string) {
     (:    To create a collection, need the parent-collection and the new-col-name :)
@@ -131,9 +146,16 @@ declare function tm:created($path as xs:string) {
     return ()
 };
 
+declare function tm:unlock-files($meta-col) {
+    for $res in xmldb:get-child-resources($meta-col)
+    let $log := util:log('info', '^^^^^^^^^^^ TRIGGER CALLS LOCK ON ' ||$meta-col || '/' || $res)
+    return rp:lock-file($meta-col || '/' || $res) (: What??? :)
+};
+
 
 declare function tm:fix-permissions($meta-col) {
     for $res in xmldb:get-child-resources($meta-col)
+    let $log := util:log('info', '^^^^^^^^^^^ TRIGGER CALLS UNLOCK ON ' ||$meta-col || '/' || $res)
     return rp:unlock-file($meta-col || '/' || $res)
 };
 

@@ -29,6 +29,24 @@ declare variable $tenant:tenant-path := "/db/pekoe/tenants/" || $tenant:tenant;
         sm:chmod($resource,$xml-permissions)
     )
  };
+ 
+ declare function tenant:fix-templates($collection, $owner-name, $group-name) {
+    sm:chown($collection,$owner-name),
+    sm:chgrp($collection,$group-name),
+    sm:chmod($collection, 'rwxrwx---'),
+    for $r in xmldb:get-child-resources(string($collection))
+    let $resource := xs:anyURI($collection || "/" || $r)
+    return (
+        sm:chown($resource,$owner-name),
+        sm:chgrp($resource,$group-name),
+        if (util:is-binary-doc($resource)) then (sm:chmod(xs:anyURI($resource),'rw-rw----')) else  (sm:chmod(xs:anyURI($resource),'rw-r-----'))
+        
+    ),
+    for $c in xmldb:get-child-collections(string($collection))
+        let $coll := xs:anyURI($collection || "/" || $c)
+        return tenant:fix-templates($coll,$owner-name,$group-name)
+     
+ };
 
 (: Recursively apply ownership to a collection hierarchy :)
 declare function tenant:fix-ownership($collection, $owner-name, $group-name) {
@@ -37,11 +55,10 @@ declare function tenant:fix-ownership($collection, $owner-name, $group-name) {
     sm:chmod($collection, 'rwxrwx---'),
     for $r in xmldb:get-child-resources(string($collection))
     let $resource := xs:anyURI($collection || "/" || $r)
-(:    let $dub := util:log('warn', '$$$$$$$$$$$$$$$ FIX CHILD RESOURCE ' || $r):)
     return (
         sm:chown($resource,$owner-name),
         sm:chgrp($resource,$group-name),
-        if (util:is-binary-doc($resource)) then (sm:chmod(xs:anyURI($resource),'rwxr-x---')) else  (sm:chmod(xs:anyURI($resource),'r--r-----'))
+        if (util:is-binary-doc($resource)) then (sm:chmod(xs:anyURI($resource),'rwxr-x---')) else  (sm:chmod(xs:anyURI($resource),'rw-r-----'))
         
     ),
     for $c in xmldb:get-child-collections(string($collection))

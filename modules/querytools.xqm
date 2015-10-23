@@ -15,6 +15,17 @@ declare function pqt:get-request-as-number($param as xs:string, $default as xs:i
     return if ($requested castable as xs:integer) then xs:integer($requested) else $default 
 };
 
+declare function pqt:mod-date($item) {
+    xmldb:last-modified(util:collection-name($item), util:document-name($item))
+};
+
+declare function pqt:get-params($pmap) {
+    map:new(
+        for $k in map:keys($pmap)  (: Get params using a map :)
+        return map:entry($k,request:get-parameter($k,$pmap($k)))
+    )
+};
+
 
 declare function pqt:get-paged-items($items) {
 (:  I would like to keep the records-per-page (rp) as a user-pref.

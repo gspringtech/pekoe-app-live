@@ -60,7 +60,7 @@
 
  3. This notice may not be removed or altered from any source distribution.
 -->
-<xslt:stylesheet xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:iae="http://www.schematron.com/namespace/iae" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" version="1.0">
+<xslt:stylesheet xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:iae="http://www.schematron.com/namespace/iae" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" version="1.0">
     <xslt:param name="schema-id"/>
 	
 	
