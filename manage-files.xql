@@ -155,6 +155,62 @@ declare function local:do-delete() {
     return (local:redirect-to-browse($quarantined, 'browse','deleted the file'))    
 };
 
+(: Are there special cases? e.g. Templates Bundles.???  Template needs a special handle anyway. :)
+declare function local:is-bundle($path) as xs:boolean {
+    (doc-available($path) and doc($path)/@bundled eq '1')
+};
+
+declare function local:trash-file-or-collection($path) as xs:string {
+    let $delete-log:= if (xmldb:collection-available($real-path)) 
+                    then util:log("warn", "GOING TO DELETE COLLECTION (real-path)" || $real-path || " (path)" || $path )
+                    else util:log("warn", "GOING TO DELETE " || util:document-name($real-path) || " FROM COLLECTION " || $parent-collection )
+                    
+    let $z := compression:zip(xs:anyURI($r),true())
+    let $stored := xmldb:store('/db/pekoe/tenants/cm/temp','test3.zip',$z)
+    return 'Deleted file ' || $path
+
+};  
+
+declare function local:good-trash-name($path) {
+    let $n := local:good-file-name($path,'collection') (: 'files/jobs/2015/11/RT-000066' -> 'files-jobs-2015-11-RT-000066' :)
+    let $trash := $local:tenant-path || '/Trash/'
+    let $ds := format-date(current-date(), '[Y][M][D]')
+(:    let $exists := util:binary-doc-available($trash || $n):)
+    (: at the moment I'm not going to allow multiple deleted versions per day :)
+    return  $n || "-" || $ds || ".zip"
+    
+};
+
+declare function local:trash-bundle($path) as xs:string {
+    (: $path points to a Job file where @bundle=1. The 'name' is that of the parent collection   :)
+    let $r := util:collection-name($path)
+    let $local-p := substring-after($r,$local:tenant-path || '/')
+    let $name := local:good-trash-name($local-p)
+    let $z := compression:zip(xs:anyURI($r),true()) (: Use Hierarchy is true so that path-to-collection AND path-within-bundle are captured. :)
+    
+    let $stored := xmldb:store($local:tenant-path, $name,$z)
+    
+    (: now - really DELETE the bundle...    :)
+    
+    return "Trashed bundle " || $name
+
+};  
+
+(: Zip the target and move to the tenant's Deleted collection. If the target is a bundle-doc, then the target is its parent. :)
+declare function local:do-trash() {
+    let $path := request:get-parameter("path","")
+    return if ($path eq $local:base-collection) 
+    then (response:set-status-code(304),response:set-header("Location", request:get-url()))
+    else
+    
+    let $real-path := $local:tenant-path || $path
+    let $parent-collection := util:collection-name($real-path)
+    let $quarantined := local:quarantined-path($parent-collection)
+    let $delete := if (local:is-bundle($path)) then local:trash-bundle($path) else local:trash-file-or-collection($path)
+                    
+    return (local:redirect-to-browse($quarantined, 'browse',$delete))   
+};
+
 (:
     The biggest hassle with a BUNDLE is knowing whether the data is IN ONE.
     A better way to write that is ...

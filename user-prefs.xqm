@@ -175,7 +175,8 @@ declare function prefs:get-bookmarks() {
 };:)
 
 declare function prefs:get-bookmarks() {
-    let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN  TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP'))
+    let $screen-dimensions := (req:cookie('screenx'),req:cookie('screeny'))
+    let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN  TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP') || ' SCREEN ' || string-join($screen-dimensions,'x'))
     let $user-bookmarks := prefs:get-pref('bookmarks')
     let $common-prefs := if (sm:is-dba($prefs:user)) then $prefs:all-prefs else if ($prefs:user-is-admin) then $prefs:admin-prefs else $prefs:common-prefs
 

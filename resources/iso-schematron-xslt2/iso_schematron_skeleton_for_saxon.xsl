@@ -408,7 +408,7 @@
       in XSLT, you need to have a schema with some queryBinding attribute name like
       "XSLT-with-my-functions" or whatever.
 -->
-<xsl:stylesheet xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:exsl="http://exslt.org/common" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:axsl="http://www.w3.org/1999/XSL/TransformAlias" extension-element-prefixes="exsl" version="2.0">
+<xsl:stylesheet xmlns:exsl="http://exslt.org/common" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:axsl="http://www.w3.org/1999/XSL/TransformAlias" extension-element-prefixes="exsl" version="2.0">
 <!-- This program implements ISO Schematron, except for abstract patterns 
 which require a preprocess.
 -->
@@ -546,7 +546,7 @@ which require a preprocess.
 <!-- Using EXSLT with all modeles (except function module: not applicable) -->
     <xsl:template match="iso:schema[@queryBinding='exslt']" priority="10">
         <xsl:comment>This XSLT was automatically generated from a Schematron schema.</xsl:comment>
-        <axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:random="http://exslt.org/random" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:dyn="http://exslt.org/dynamic" xmlns:math="http://exslt.org/math" extension-element-prefixes="date dyn exsl math random regexp set str">
+        <axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:random="http://exslt.org/random" xmlns:dyn="http://exslt.org/dynamic" xmlns:math="http://exslt.org/math" extension-element-prefixes="date dyn exsl math random regexp set str">
             <xsl:apply-templates select="iso:ns"/>
 	    <!-- Handle the namespaces before the version attribute: reported to help SAXON -->
             <xsl:attribute name="version">1.0</xsl:attribute>

@@ -219,6 +219,7 @@ declare function pekoe-schema:schema-page($schema,$doctype) {
 
 for $f in $schema/(field,fragment-ref)[starts-with(@path,'/')]
 return <div class='textlink'>{$link-path || $f/@path}</div>
+
 }
 {if (sm:is-dba(sm:id()//sm:username)) then <a href='/exist/restxq/pekoe/schema/{$schema/@for/string()}/text'>Generate Text Template</a> else ()}
            </div>

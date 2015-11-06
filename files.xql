@@ -1,6 +1,6 @@
 xquery version "3.1";
 (: Files list. 
-    Don't use this as an example 'list'. Better to visit one of the Client lists like AD-Bookings.
+    Don't use this as an example 'list'. Better to visit one of the Client lists like AD-Bookings or Distribution
 :)
 
 (: TODO - fix the XQuery so that the Breadcrumbs work and the full path is not included in the result. 
@@ -27,10 +27,13 @@ declare option output:media-type "text/html";
 
 declare variable $local:current-collection := request:get-parameter('collection','/files');     (:  This should be used when constructing paths for the children.:)
 declare variable $local:collection-path := $tenant:tenant-path || $local:current-collection;    (:  This should be used when querying the db.:)
+
 (: NOTE: To process this by type (collection, query, Job), create a sequence of map {name: , type: }    :)
-declare variable $local:all-items := (
-    xmldb:get-child-collections($local:collection-path),
-    xmldb:get-child-resources($local:collection-path)[not(ends-with(.,'.xqm'))]);
+declare variable $local:all-items := (    
+    for $f in xmldb:get-child-resources($local:collection-path)[not(ends-with(.,'.xqm'))] order by $f return $f,
+    for $f in xmldb:get-child-collections($local:collection-path) order by $f return $f
+    );
+    
 declare variable $local:view := request:get-parameter('view','');                               (: Provides the option of changing the list of displayed fields. :)
 
 declare variable $local:custom-config := local:get-relevant-config();
@@ -433,7 +436,7 @@ let $content :=  map:new(($default-content,  map {
         </script>
     },
     (:    to add params that aren't in the query-string , add them as a sequence of maps :)
-    'order-by' : request:get-parameter('order-by','ascending-name'),
+    'order-by' : request:get-parameter('order-by',''),
     
     'custom-row-parts' : ['list-all', 'new-item', 'text-search', 'xquery-search'],                                   (: Array determines the features addad to the Custom Row :)
     'custom-row' : map:new(($default-content?custom-row,  map {                                         (: map of html fragments for non-standard parts of the Custom Row. Also allows override. :)

@@ -133,28 +133,36 @@ declare function lw:configure-content-map($config-map) {
 
 
 declare function lw:xquery-search-btn($conf) {
+(:    util:log('warn', 'KEYS IN CONF ' || string-join(map:keys($conf),', ') ),:)
+
     <div class='btn-group' ><!-- XQuery search -->
         <form method='get' class='form-inline' action=''>
            <input type='hidden' name='collection' value='{$conf?path}'/>
+           { if (map:contains($conf,'params')) then map:for-each-entry($conf?params ,function ($k,$v) {<input type='hidden' name='{$k}' value='{$v}' /> })   else ()        }
            <input type='text' placeholder='/{$conf?doctype}[...]' name='xpath' value='{$conf?xpath}' id='xpath' class='form-control'/>
            <button type="submit" value="xpath" name="action"  class='btn btn-default'>XQuery</button>
             {
-           (: If the xquery contains a parameter then the bookmark should be a search.  :)
+           (: If the xquery contains a parameter then the bookmark should be a search.  - e.g. /annual-distribution[financial-year eq $text]  :)
             if ($conf?xpath eq '') then ()
             else if (contains($conf?xpath, '$')) then (
                (: This is for the SEARCH param :)
                let $parts := analyze-string($conf?xpath, '\$\w+')  
+               let $params := map:new(($conf?params,map{'action':'xpath', 'collection': $conf?path, 'xpath': $conf?xpath}))
+               let $path-params := string-join(map:for-each-entry($params, function ($k,$v){ $k || '=' || $v }), '&amp;')
                return 
-               <span style='cursor:move' title='bookmark for XQuery with parameter in {$conf?path}'
-                   data-href='{$conf?path-to-me}?action=xpath&amp;collection={$conf?path}&amp;xpath={$conf?xpath}'
+               <span style='cursor:move' title='Bookmark for XQuery with parameter in {$conf?path}'
+                   data-href='{$conf?path-to-me}?{$path-params}'
                    data-title='' 
                    data-type='search'
                    data-param='{substring-after($parts//fn:match,'$')}'><i class='glyphicon glyphicon-bookmark'/></span>
             )
             else (
                (: This is a standard bookmark. :)
-                <span draggable='true' title='bookmark for XQuery in {$conf?path}' 
-                   data-href='{$conf?path-to-me}?action=xpath&amp;collection={$conf?path}&amp;xpath={$conf?xpath}' 
+               let $params := map:new(($conf?params,map{'action':'xpath', 'collection': $conf?path, 'xpath': $conf?xpath}))
+               let $path-params := string-join(map:for-each-entry($params, function ($k,$v){ $k || '=' || $v }), '&amp;')
+               return
+                <span draggable='true' title='Bookmark for XQuery in {$conf?path}' 
+                   data-href='{$conf?path-to-me}?{$path-params}'        
                    data-title='' 
                    data-type='report'><i class='glyphicon glyphicon-bookmark'/></span>
             )
@@ -178,7 +186,8 @@ declare function lw:xquery-search-btn($conf) {
                        $s.remove();
                    });
                    var $f = $x.parent('form');
-                   $f.on('submit', function(e){
+                   $f.on('submit', function(e){ // Does the query contain a $param? If so, show an additional INPUT
+                        if ($x.val() === '') { return false; }
                        // to keep things simple, work on either $text or $date inputs.
                        // I want to allow more than one text entry and more than one date.
                        // $text1, $text2, $date, $date1 $date2
@@ -343,6 +352,7 @@ declare function lw:pagination-map($content) {
     }
     return map:new(($content, map {'pagination-map': $pages-map}))
 };
+
 (: '/exist/pekoe-app/files.xql?collection=', $lw:quarantined-path e.g. /files/AD-Bookings.xql :)
 (: Note - See Tabular-data.xql for an alternative.   :)
 declare function lw:breadcrumbs($base, $path) {
@@ -387,7 +397,8 @@ declare function lw:pagination($pagination-map) {
                 (for $n in $first to $last return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$path-params}p={$n}'>{$n}</a></li>),
                 (: Go Next:)<li>{if ($current eq $total) then attribute class {'disabled'} else ()}<a title='Next' href="?{$path-params}p={if ($current eq $total) then $current else $current + 1}"><i class='fa fa-angle-right'></i></a></li>,
                 (: Go Last:)<li>{if ($current eq $total) then attribute class {'disabled'} else ()}<a title='Last' href="?{$path-params}p={$total}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>
-                
+                (: RPP:)
+(:                <li><a title='Records per page' href="?{$path-params}rpp={$total}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>:)
                 )
             )
             }
@@ -458,6 +469,27 @@ declare function lw:get-ordered-items($content as map(*) ) {
     else $content?items
 };
 
+declare function lw:csv-page($original-content as map(*)) {
+
+(:    response:stream-binary((
+        array:for-each($content('column-headings'), lw:make-column-heading(?,$content))
+    for $row at $i in lw:get-ordered-items($content)[position() = $pm?start to $pm?end]
+    let $row-data := $row-fn($row) (\: Row-data are the calculations and common values needed to present each row in the table. :\)
+    let $cr := "&#13;"
+    let $t := "&#9;"
+    return 
+(\: How did I do CSV? Can I use a simple string-join?  :\)
+            <tr>
+                
+                {array:for-each($content('column-headings'), function($field) {
+                    if (map:contains($fields, $field)) then 
+                         <td>{try { $fields($field)?value($row, $row-data)} catch * { util:log('warn', '****************** FIELD ERROR FOR ' || $field || ' of row ' || $i || " : "|| $err:description ) }}</td>
+                    else <td>&#160;</td>
+            })}</tr>:)
+
+()
+};
+
 (:
 ------------------------------------------------------------- THE MAIN FEATURE ---------------------------------------------
 list-page requires a map of $content
@@ -485,6 +517,16 @@ return
         <link rel='stylesheet'        href='/pekoe-common/dist/css/bootstrap.css' />
         <link rel='stylesheet'        href='/pekoe-common/list/list-items.css' />
         <link rel='stylesheet'        href='/pekoe-common/dist/font-awesome/css/font-awesome.min.css' />
+        <style>/* <![CDATA[ */
+        @media print { 
+            .row, .glyphicon { display: none } 
+            body, td { font-size: 8pt !important; }
+            td { padding : 2px !important; }
+            a[href]::before, a[href]::after { content : "" !important; }
+            button { display: none; }
+        }
+        /* ]]> */
+        </style>
         <script type='text/javascript' src='/pekoe-common/jquery/dist/jquery.js' ></script>
         <script type='text/javascript' src="/pekoe-common/jquery-ui-1.11.0/jquery-ui.js" ></script>
         <script type='text/javascript' src='/pekoe-common/dist/js/bootstrap.min.js' ></script>
@@ -493,6 +535,7 @@ return
         { comment { 
             for $k in map:keys($original-content) return concat('&#10;', $k)
         }}
+        {if ($content?style) then $content?style else () }
     </head>
 <body>
  <div class='container-fluid'>
@@ -505,7 +548,7 @@ return
         <div class='pull-right' role='group' aria-label='Open actions'>
            
             <div class="dropdown btn-group"><!-- ##################### FILE MENU ################### -->
-              <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
+              <button class="btn btn-default dropdown-toggle   p-needs-selection" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
                 File menu
                 <span class="caret"></span>
               </button>
@@ -596,6 +639,10 @@ return
                 {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='rename' data-params='name'>Rename</a></li> else () }
                 <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='move-up' data-confirm='yes'>Move to parent folder</a></li>
                 {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='delete' data-confirm='yes'>Delete</a></li> else ()}
+                {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then 
+                    (<li role="presentation"><a id='openItem' class='menuitem  p-needs-selection' tabindex="-1" href="/exist/pekoe-app/manage-files.xql" >Open</a></li>,
+                    <li role="presentation"><a id='openItemTab' class='menuitem' tabindex="-1" href="/exist/pekoe-app/manage-files.xql" >Open in new tab</a></li>)
+                else () }
                 <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Unlock</a></li>
               </ul>
             </div>
@@ -690,7 +737,7 @@ return
                 if (map:contains($footer-fields, $field)) then 
                 
                  <td>{try { $footer-fields($field)?value($content?items)} catch * { util:log('warn', '****************** FIELD ERROR FOR ' || $field || $err:description ) }}</td>
-                else <td>-no footer for {$field} -</td>
+                else <td>&#160;</td>
             })
             }
             </tfoot>

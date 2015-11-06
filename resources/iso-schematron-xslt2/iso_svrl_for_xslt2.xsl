@@ -132,7 +132,7 @@
              terminate= yes | no | true | false | assert  Terminate on the first failed assertion or successful report
                                          Note: whether any output at all is generated depends on the XSLT implementation.
 -->
-<xsl:stylesheet xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:axsl="http://www.w3.org/1999/XSL/TransformAlias" version="2.0">
+<xsl:stylesheet xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:axsl="http://www.w3.org/1999/XSL/TransformAlias" version="2.0">
 
 <!-- Select the import statement and adjust the path as 
    necessary for your system.
