@@ -4,6 +4,7 @@
 xquery version "3.0"; 
 declare namespace pekoe-schema = "http://pekoe.io/schema";
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
+declare namespace http="http://expath.org/ns/http-client";
 
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
 import module namespace list-wrapper = "http://pekoe.io/list/wrapper" at "list-wrapper.xqm";

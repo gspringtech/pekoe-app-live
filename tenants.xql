@@ -4,7 +4,7 @@ module namespace tenant = "http://pekoe.io/tenant";
    Module is called by others if a list of tenants is needed.
 :)
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
-
+declare namespace http="http://expath.org/ns/http-client";
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare variable $tenant:pekoe-tenants := '/db/pekoe/tenants';
 declare variable $tenant:selected-tenant := req:header("tenant");

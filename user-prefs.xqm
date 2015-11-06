@@ -67,6 +67,7 @@ declare namespace prefs = "http://pekoe.io/user-prefs";
 
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
 
+declare namespace http="http://expath.org/ns/http-client";
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 
 

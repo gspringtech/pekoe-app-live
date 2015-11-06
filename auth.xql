@@ -6,6 +6,7 @@ I still need to tell them something. "Please login at your own address" or somet
 :)
 
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
+declare namespace http="http://expath.org/ns/http-client";
 
 declare 
 %rest:GET
