@@ -98,24 +98,16 @@
 	
 	3. This notice may not be removed or altered from any source distribution.
 -->
-<xslt:stylesheet xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:relax="http://relaxng.org/ns/structure/1.0" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:dsdl="http://www.schematron.com/namespace/dsdl" xmlns:crdl="http://purl.oclc.org/dsdl/crepdl/ns/structure/1.0" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" xmlns:sch-check="http://www.schematron.com/namespace/sch-check" xmlns:dtll="http://www.jenitennison.com/datatypes" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0">
-	<!-- Note: The URL for the dsdl namespace is not official -->
+<xslt:stylesheet xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:relax="http://relaxng.org/ns/structure/1.0" xmlns:schold="http://www.ascc.net/xml/schematron" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:dsdl="http://www.schematron.com/namespace/dsdl" xmlns:crdl="http://purl.oclc.org/dsdl/crepdl/ns/structure/1.0" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" xmlns:sch-check="http://www.schematron.com/namespace/sch-check" xmlns:dtll="http://www.jenitennison.com/datatypes" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0"><!-- Note: The URL for the dsdl namespace is not official -->
     <xsl:param name="include-schematron">true</xsl:param>
     <xsl:param name="include-crdl">true</xsl:param>
     <xsl:param name="include-xinclude">true</xsl:param>
     <xsl:param name="include-dtll">true</xsl:param>
     <xsl:param name="include-relaxng">true</xsl:param>
-    <xsl:param name="include-xlink">true</xsl:param>
-
-   
-    <!-- ========================================================== -->
-    <!-- Output and process contents, check Schematron XPaths too   -->
-    <!-- ========================================================== -->
+    <xsl:param name="include-xlink">true</xsl:param><!-- ========================================================== --><!-- Output and process contents, check Schematron XPaths too   --><!-- ========================================================== -->
     <xsl:template match="/">
         <xsl:apply-templates select="." mode="dsdl:go"/>
-    </xsl:template>
-
-	<!-- output everything else unchanged. But check Xpaths here.  -->
+    </xsl:template><!-- output everything else unchanged. But check Xpaths here.  -->
     <xslt:template match="iso:rule[@context]" mode="dsdl:go">
         <xsl:call-template name="sch-check:xpath-wf-message">
             <xsl:with-param name="string" select=" @context "/>
@@ -175,28 +167,14 @@
             <xslt:copy-of select="@*"/>
             <xslt:apply-templates mode="dsdl:go"/>
         </xslt:copy>
-    </xslt:template>
-
-		<!-- output everything else unchanged -->
+    </xslt:template><!-- output everything else unchanged -->
     <xslt:template match="node()" priority="-1" mode="dsdl:go">
         <xslt:copy>
             <xslt:copy-of select="@*"/>
             <xslt:apply-templates mode="dsdl:go"/>
         </xslt:copy>
-    </xslt:template>
-
-
-
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 2 - Regular grammar-based validation - RELAX NG        -->
-	<!-- This only implements relax:extRef not relax:include which   -->
-	<!-- is complex.                                                 -->
-	<!-- =========================================================== -->
-    <xslt:template match="relax:extRef" mode="dsdl:go">
-
-
-		<!-- Insert subschema -->
+    </xslt:template><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 2 - Regular grammar-based validation - RELAX NG        --><!-- This only implements relax:extRef not relax:include which   --><!-- is complex.                                                 --><!-- =========================================================== -->
+    <xslt:template match="relax:extRef" mode="dsdl:go"><!-- Insert subschema -->
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
         <xsl:processing-instruction name="DSDL_INCLUDE_START">
@@ -216,9 +194,7 @@
 							Error: Impossible URL in RELAX NG extRef
 							include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//*[@xml:id= $fragment-id ] | id( $fragment-id) | //*[@id= $fragment-id ]"/>
                     </xslt:when>
@@ -229,8 +205,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use a for-each so that the id() function works correctly on the external document -->
+                        </xsl:if><!-- use a for-each so that the id() function works correctly on the external document -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= $fragment-id ]                           |  id( $fragment-id)                         | $theDocument_1//*[@id= $fragment-id ]"/>
                             <xsl:if test="not($theFragment_1)">
@@ -265,18 +240,7 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xslt:template>
-
-
-
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 3 - Rule-based validation - Schematron                 -->
-	<!-- =========================================================== -->
-
-
-	<!-- Extend the URI syntax to allow # references -->
-	<!-- Add experimental support for simple containers like  /xxx:xxx/iso:pattern to allow better includes -->
+    </xslt:template><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 3 - Rule-based validation - Schematron                 --><!-- =========================================================== --><!-- Extend the URI syntax to allow # references --><!-- Add experimental support for simple containers like  /xxx:xxx/iso:pattern to allow better includes -->
     <xsl:template match="iso:include" mode="dsdl:go">
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
@@ -296,15 +260,10 @@
                         <xsl:message>
 							Error: Impossible URL in Schematron include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//iso:*[@xml:id= $fragment-id ]                  |id( $fragment-id)                 | //iso:*[@id= $fragment-id ]"/>
-                    </xslt:when>
-
-					<!-- case where there is a fragment in another document (should be an iso: element) -->
-					<!-- There are three cases for includes with fragment:
+                    </xslt:when><!-- case where there is a fragment in another document (should be an iso: element) --><!-- There are three cases for includes with fragment:
 						0) No href file or no matching id - error!
 						1) REMOVED
 						
@@ -317,49 +276,35 @@
 					-->
                     <xsl:when test="string-length( $fragment-id ) &gt; 0">
                         <xsl:variable name="theDocument_1" select="document( $document-uri,/ )"/>
-                        <xsl:variable name="originalParent" select=".."/>
-
-						<!-- case 0 -->
+                        <xsl:variable name="originalParent" select=".."/><!-- case 0 -->
                         <xsl:if test="not($theDocument_1)">
                             <xsl:message terminate="no">
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to external document -->
+                        </xsl:if><!-- use for-each to rebase id() to external document -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select=" $theDocument_1//iso:*[@xml:id= $fragment-id ] |                   id($fragment-id) |                  $theDocument_1//iso:*[@id= $fragment-id ]"/>
-                            <xsl:choose>
-								<!-- case 0 -->
+                            <xsl:choose><!-- case 0 -->
                                 <xsl:when test="not($theFragment_1)">
                                     <xsl:message terminate="no">
                                         <xsl:text>Unable to locate id attribute: </xsl:text>
                                         <xsl:value-of select="@href"/>
                                     </xsl:message>
-                                </xsl:when>
-
-
-								<!-- case 1 REMOVED -->
-
-								<!-- case 2 -->
+                                </xsl:when><!-- case 1 REMOVED --><!-- case 2 -->
                                 <xsl:when test=" $theFragment_1/self::iso:schema ">
                                     <xsl:message>
 										Schema error: Use include to
 										include fragments, not a whole
 										schema
 									</xsl:message>
-                                </xsl:when>
-
-								<!-- case 3 -->
+                                </xsl:when><!-- case 3 -->
                                 <xsl:otherwise>
                                     <xsl:apply-templates select=" $theFragment_1[1]" mode="dsdl:go"/>
                                 </xsl:otherwise>
                             </xsl:choose>
                         </xsl:for-each>
-                    </xsl:when>
-
-					<!-- Case where there is no ID so we include the whole document -->
-					<!-- Experimental addition: include fragments of children -->
+                    </xsl:when><!-- Case where there is no ID so we include the whole document --><!-- Experimental addition: include fragments of children -->
                     <xsl:otherwise>
                         <xsl:variable name="theDocument_2" select="document( $document-uri,/ )"/>
                         <xsl:variable name="theFragment_2" select="$theDocument_2/iso:*"/>
@@ -369,9 +314,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-
-						<!-- There are three cases for includes:
+                        </xsl:if><!-- There are three cases for includes:
 							0) No text specified- error!
 							
 							1) REMOVED
@@ -383,30 +326,22 @@
 							
 							3) Otherwise, include the pointed-to element
 						-->
-                        <xsl:choose>
-							<!-- case 0 -->
+                        <xsl:choose><!-- case 0 -->
                             <xsl:when test="not($theFragment_2) and not ($theContainedFragments)">
                                 <xsl:message terminate="no">
                                     <xsl:text>Unable to locate id attribute: </xsl:text>
                                     <xsl:value-of select="@href"/>
                                 </xsl:message>
-                            </xsl:when>
-
-							<!-- case 1 removed -->
-
-							<!-- case 2 -->
+                            </xsl:when><!-- case 1 removed --><!-- case 2 -->
                             <xsl:when test=" $theFragment_2/self::iso:schema or $theContainedFragments/self::iso:schema">
                                 <xsl:message>
 									Schema error: Use include to include
 									fragments, not a whole schema
 								</xsl:message>
-                            </xsl:when>
-
-							<!-- If this were XLST 2, we could use  
+                            </xsl:when><!-- If this were XLST 2, we could use  
 								if ($theFragment) then $theFragment else $theContainedFragments
 								here (thanks to KN)
-							-->
-							<!-- case 3 -->
+							--><!-- case 3 -->
                             <xsl:otherwise>
                                 <xsl:apply-templates select="$theFragment_2 " mode="dsdl:go"/>
                             </xsl:otherwise>
@@ -418,11 +353,7 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xsl:template>
-
-
-	<!-- WARNING   sch:extends[@href] is experimental and non standard  -->
-	<!-- Basically, it adds the children of the selected element, not the element itself.  -->
+    </xsl:template><!-- WARNING   sch:extends[@href] is experimental and non standard  --><!-- Basically, it adds the children of the selected element, not the element itself.  -->
     <xsl:template match="iso:extends[@href]" mode="dsdl:go">
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
@@ -442,15 +373,10 @@
                         <xsl:message>
 							Error: Impossible URL in Schematron include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//iso:*[@xml:id= $fragment-id ]/*                  |id( $fragment-id)/*                 | //iso:*[@id= $fragment-id ]/*"/>
-                    </xslt:when>
-
-					<!-- case where there is a fragment in another document (should be an iso: element) -->
-					<!-- There are three cases for includes with fragment:
+                    </xslt:when><!-- case where there is a fragment in another document (should be an iso: element) --><!-- There are three cases for includes with fragment:
 						0) No href file or no matching id - error!
 						1) REMOVED
 						
@@ -460,43 +386,28 @@
 					-->
                     <xsl:when test="string-length( $fragment-id ) &gt; 0">
                         <xsl:variable name="theDocument_1" select="document( $document-uri,/ )"/>
-                        <xsl:variable name="originalParent" select=".."/>
-
-						<!-- case 0 -->
+                        <xsl:variable name="originalParent" select=".."/><!-- case 0 -->
                         <xsl:if test="not($theDocument_1)">
                             <xsl:message terminate="no">
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to external document -->
+                        </xsl:if><!-- use for-each to rebase id() to external document -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select=" $theDocument_1//iso:*[@xml:id= $fragment-id ] |                   id($fragment-id) |                  $theDocument_1//iso:*[@id= $fragment-id ]"/>
-                            <xsl:choose>
-								<!-- case 0 -->
+                            <xsl:choose><!-- case 0 -->
                                 <xsl:when test="not($theFragment_1)">
                                     <xsl:message terminate="no">
                                         <xsl:text>Unable to locate id attribute: </xsl:text>
                                         <xsl:value-of select="@href"/>
                                     </xsl:message>
-                                </xsl:when>
-
-
-								<!-- case 1 REMOVED -->
-
-								<!-- case 2 REMOVED -->
-
-
-								<!-- case 3 -->
+                                </xsl:when><!-- case 1 REMOVED --><!-- case 2 REMOVED --><!-- case 3 -->
                                 <xsl:otherwise>
                                     <xsl:apply-templates select=" $theFragment_1[1]/*" mode="dsdl:go"/>
                                 </xsl:otherwise>
                             </xsl:choose>
                         </xsl:for-each>
-                    </xsl:when>
-
-					<!-- Case where there is no ID so we include the whole document -->
-					<!-- Experimental addition: include fragments of children -->
+                    </xsl:when><!-- Case where there is no ID so we include the whole document --><!-- Experimental addition: include fragments of children -->
                     <xsl:otherwise>
                         <xsl:variable name="theDocument_2" select="document( $document-uri,/ )"/>
                         <xsl:variable name="theFragment_2" select="$theDocument_2/iso:*"/>
@@ -506,9 +417,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-
-						<!-- There are three cases for includes:
+                        </xsl:if><!-- There are three cases for includes:
 							0) No text specified- error!
 							
 							1) REMOVED
@@ -517,24 +426,16 @@
 							
 							3) Otherwise, include the pointed-to element
 						-->
-                        <xsl:choose>
-							<!-- case 0 -->
+                        <xsl:choose><!-- case 0 -->
                             <xsl:when test="not($theFragment_2) and not ($theContainedFragments)">
                                 <xsl:message terminate="no">
                                     <xsl:text>Unable to locate id attribute: </xsl:text>
                                     <xsl:value-of select="@href"/>
                                 </xsl:message>
-                            </xsl:when>
-
-							<!-- case 1 removed -->
-
-							<!-- case 2 removed -->
-
-							<!-- If this were XLST 2, we could use  
+                            </xsl:when><!-- case 1 removed --><!-- case 2 removed --><!-- If this were XLST 2, we could use  
 								if ($theFragment) then $theFragment else $theContainedFragments
 								here (thanks to KN)
-							-->
-							<!-- case 3 -->
+							--><!-- case 3 -->
                             <xsl:otherwise>
                                 <xsl:apply-templates select="$theFragment_2/* " mode="dsdl:go"/>
                             </xsl:otherwise>
@@ -546,17 +447,7 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xsl:template>
-
-
-
-	<!-- =========================================================== -->
-	<!-- Handle Schematron 1.6 inclusions: clone of ISO code above   -->
-	<!-- =========================================================== -->
-
-
-	<!-- Extend the URI syntax to allow # references -->
-	<!-- Add experimental support for simple containers like  /xxx:xxx/schold:pattern to allow better includes -->
+    </xsl:template><!-- =========================================================== --><!-- Handle Schematron 1.6 inclusions: clone of ISO code above   --><!-- =========================================================== --><!-- Extend the URI syntax to allow # references --><!-- Add experimental support for simple containers like  /xxx:xxx/schold:pattern to allow better includes -->
     <xsl:template match="schold:include" mode="dsdl:go">
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
@@ -576,14 +467,10 @@
                         <xsl:message>
 							Error: Impossible URL in Schematron include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//schold:*[@xml:id= $fragment-id ]                  |id( $fragment-id)                 | //schold:*[@id= $fragment-id ]"/>
-                    </xslt:when>
-
-					<!-- case where there is a fragment in another document (should be an iso: element) -->
+                    </xslt:when><!-- case where there is a fragment in another document (should be an iso: element) -->
                     <xsl:when test="string-length( $fragment-id ) &gt; 0">
                         <xsl:variable name="theDocument_1" select="document( $document-uri,/ )"/>
                         <xsl:if test="not($theDocument_1)">
@@ -591,8 +478,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to $theDocument -->
+                        </xsl:if><!-- use for-each to rebase id() to $theDocument -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select=" $theDocument_1//schold:*[@xml:id= $fragment-id ] |                id($fragment-id) |                $theDocument_1//schold:*[@id= $fragment-id ]"/>
                             <xsl:if test=" $theFragment_1/self::schold:schema ">
@@ -609,10 +495,7 @@
                             </xsl:if>
                             <xsl:apply-templates select=" $theFragment_1[1]" mode="dsdl:go"/>
                         </xsl:for-each>
-                    </xsl:when>
-
-					<!-- Case where there is no ID so we include the whole document -->
-					<!-- Experimental addition: include fragments of children -->
+                    </xsl:when><!-- Case where there is no ID so we include the whole document --><!-- Experimental addition: include fragments of children -->
                     <xsl:otherwise>
                         <xsl:variable name="theDocument_2" select="document( $document-uri,/ )"/>
                         <xsl:variable name="theFragment_2" select="$theDocument_2/iso:*"/>
@@ -634,8 +517,7 @@
                                 <xsl:text>Unable to locate id attribute: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- If this were XLST 2, we could use  
+                        </xsl:if><!-- If this were XLST 2, we could use  
 							if ($theFragment) then $theFragment else $theContainedFragments
 							here (thanks to KN)
 						-->
@@ -643,8 +525,7 @@
                             <xsl:when test=" $theFragment_2 ">
                                 <xsl:apply-templates select="$theFragment_2 " mode="dsdl:go"/>
                             </xsl:when>
-                            <xsl:otherwise>
-								<!-- WARNING!  EXPERIMENTAL! Use at your own risk. This may be discontinued! -->
+                            <xsl:otherwise><!-- WARNING!  EXPERIMENTAL! Use at your own risk. This may be discontinued! -->
                                 <xsl:apply-templates select="  $theContainedFragments " mode="dsdl:go"/>
                             </xsl:otherwise>
                         </xsl:choose>
@@ -655,16 +536,8 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xsl:template>
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 5 - DataType Library Language - DTLL                   -->
-	<!-- Committee Draft  Experimental support only                  -->
-	<!-- The <include> element may well be replaced by XInclude in   -->
-	<!-- any final version.                                          -->
-	<!-- =========================================================== -->
-    <xslt:template match="dtll:include" mode="dsdl:go">
-		<!-- Insert subschema -->
+    </xsl:template><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 5 - DataType Library Language - DTLL                   --><!-- Committee Draft  Experimental support only                  --><!-- The <include> element may well be replaced by XInclude in   --><!-- any final version.                                          --><!-- =========================================================== -->
+    <xslt:template match="dtll:include" mode="dsdl:go"><!-- Insert subschema -->
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
         <xsl:processing-instruction name="DSDL_INCLUDE_START">
@@ -683,9 +556,7 @@
                         <xsl:message>
 							Error: Impossible URL in DTLL include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//*[@xml:id= $fragment-id ] | id( $fragment-id)                 | //*[@id= $fragment-id ]"/>
                     </xslt:when>
@@ -696,8 +567,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to $theDocument -->
+                        </xsl:if><!-- use for-each to rebase id() to $theDocument -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= $fragment-id ]                | id( $fragment-id )                 | $theDocument_1//*[@id= $fragment-id ]"/>
                             <xsl:if test="not($theFragment_1)">
@@ -732,15 +602,8 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xslt:template>
-
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 7 - Character Repertoire Description Language - CRDL   -->
-	<!-- Final Committee Draft 2008-01-11 Experimental support only  -->
-	<!-- =========================================================== -->
-    <xslt:template match="crdl:ref" mode="dsdl:go">
-		<!-- Insert subschema -->
+    </xslt:template><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 7 - Character Repertoire Description Language - CRDL   --><!-- Final Committee Draft 2008-01-11 Experimental support only  --><!-- =========================================================== -->
+    <xslt:template match="crdl:ref" mode="dsdl:go"><!-- Insert subschema -->
         <xsl:variable name="document-uri" select="substring-before(concat(@href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@href, '#')"/>
         <xsl:processing-instruction name="DSDL_INCLUDE_START">
@@ -759,9 +622,7 @@
                         <xsl:message>
 							Error: Impossible URL in CRDL include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//*[@xml:id= $fragment-id ] | id( $fragment-id)                | //*[@id= $fragment-id ]"/>
                     </xslt:when>
@@ -772,8 +633,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to $theDocument -->
+                        </xsl:if><!-- use for-each to rebase id() to $theDocument -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= $fragment-id ]                | id( $fragment-id )                | $theDocument_1//*[@id= $fragment-id ]"/>
                             <xsl:if test="not($theFragment_1)">
@@ -808,24 +668,8 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xslt:template>
-
-
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 4 - Namespace-based Validation Dispatching Language - NVDL -->
-	<!-- Note: This does not include schemas referenced for          -->
-	<!-- validation, it merely handles any simple XIncludes          -->
-	<!-- =========================================================== -->
-	<!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   -->
-	<!-- Part 8 - Document Schema Renaming Language - DSRL           -->
-	<!-- Note: Final? Committee Draft   Experimental support only    -->
-	<!-- =========================================================== -->
-	<!-- XInclude support for id based references only, with 1 level -->
-	<!-- of fallback.                                                -->
-	<!-- =========================================================== -->
-    <xslt:template mode="dsdl:go" match="xi:include[@href][not(@parseType) or @parseType ='xml']">
-		<!-- Simple inclusions only here -->
+    </xslt:template><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 4 - Namespace-based Validation Dispatching Language - NVDL --><!-- Note: This does not include schemas referenced for          --><!-- validation, it merely handles any simple XIncludes          --><!-- =========================================================== --><!-- ISO/IEC 19757 - DSDL Document Schema Definition Languages   --><!-- Part 8 - Document Schema Renaming Language - DSRL           --><!-- Note: Final? Committee Draft   Experimental support only    --><!-- =========================================================== --><!-- XInclude support for id based references only, with 1 level --><!-- of fallback.                                                --><!-- =========================================================== -->
+    <xslt:template mode="dsdl:go" match="xi:include[@href][not(@parseType) or @parseType ='xml']"><!-- Simple inclusions only here -->
         <xsl:processing-instruction name="DSDL_INCLUDE_START">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
@@ -855,28 +699,21 @@
 							Fatal Error: Impossible URL in XInclude
 							include
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( @href ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//*[@xml:id= current()/@xpointer  ] | id( @xpointer)                | //*[@id= current()/@xpointer  ]"/>
                     </xslt:when>
                     <xsl:when test="string-length( @xpointer ) &gt; 0">
                         <xsl:variable name="theDocument_1" select="document( @href,/ )"/>
-                        <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= current()/@xpointer  ]                             | $theDocument_1//*[@id= current()/@xpointer  ]"/>
-						<!-- removed
+                        <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= current()/@xpointer  ]                             | $theDocument_1//*[@id= current()/@xpointer  ]"/><!-- removed
 							| $theDocument_1/id( @xpointer)
 							because it requires rebasing in XSLT1 and that would mess up the use of current()
-						-->
-
-
-						<!-- Allow one level of fallback, to another XInclude -->
+						--><!-- Allow one level of fallback, to another XInclude -->
                         <xsl:if test="not($theDocument_1)">
                             <xsl:choose>
                                 <xsl:when test="xi:fallback">
                                     <xsl:variable name="theDocument_2" select="document( xi:fallback[1]/xi:include[not(@parseType)                       or @parseType='xml']/@href,/ )"/>
-                                    <xsl:variable name="theFragment_2" select="$theDocument_2//*[@xml:id= current()/xi:fallback[1]/xi:include/@xpointer  ]                   | $theDocument_2//*[@id= current()/xi:fallback[1]/xi:include/@xpointer  ]"/>
-									<!-- removed 
+                                    <xsl:variable name="theFragment_2" select="$theDocument_2//*[@xml:id= current()/xi:fallback[1]/xi:include/@xpointer  ]                   | $theDocument_2//*[@id= current()/xi:fallback[1]/xi:include/@xpointer  ]"/><!-- removed 
 										| $theDocument_2/id( xi:fallback[1]/xi:include/@xpointer)
 										because it id() would need rebasing in XSLT1 and that would mess up use of current()
 									-->
@@ -897,9 +734,7 @@
                             </xsl:choose>
                         </xsl:if>
                         <xsl:apply-templates select=" $theFragment_1" mode="dsdl:go"/>
-                    </xsl:when>
-
-					<!-- Document but no fragment specified -->
+                    </xsl:when><!-- Document but no fragment specified -->
                     <xsl:otherwise>
                         <xsl:variable name="theDocument_3" select="document( @href,/ )"/>
                         <xsl:variable name="theFragment_3" select="$theDocument_3/*"/>
@@ -917,11 +752,7 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@href"/>
         </xsl:processing-instruction>
-    </xslt:template>
-
-	<!-- =========================================================== -->
-	<!-- W3C XLink 1.1 embedded simple links                        -->
-	<!-- =========================================================== -->
+    </xslt:template><!-- =========================================================== --><!-- W3C XLink 1.1 embedded simple links                        --><!-- =========================================================== -->
     <xslt:template match="*[@xlink:href][not(parent::*[@xlink:type='complex'])]             [not(@xlink:type) or (@xlink:type='simple')]             [@xlink:show='embed']             [not(@xlink:actuate) or (@xlink:actuate='onLoad')]" mode="dsdl:go" priority="1">
         <xsl:variable name="document-uri" select="substring-before(concat(@xlink:href,'#'), '#')"/>
         <xsl:variable name="fragment-id" select="substring-after(@xlink:href, '#')"/>
@@ -942,9 +773,7 @@
 							Error: Impossible URL in XLink embedding
 							link
 						</xsl:message>
-                    </xsl:when>
-
-					<!-- this case is when there is in embedded schema in the same document elsewhere -->
+                    </xsl:when><!-- this case is when there is in embedded schema in the same document elsewhere -->
                     <xslt:when test="string-length( $document-uri ) = 0">
                         <xslt:apply-templates mode="dsdl:go" select="//*[@xml:id= $fragment-id ] | id( $fragment-id)                 | //*[@id= $fragment-id ]"/>
                     </xslt:when>
@@ -955,8 +784,7 @@
                                 <xsl:text>Unable to open referenced included file: </xsl:text>
                                 <xsl:value-of select="@xlink:href"/>
                             </xsl:message>
-                        </xsl:if>
-						<!-- use for-each to rebase id() to $theDocument -->
+                        </xsl:if><!-- use for-each to rebase id() to $theDocument -->
                         <xsl:for-each select="$theDocument_1">
                             <xsl:variable name="theFragment_1" select="$theDocument_1//*[@xml:id= $fragment-id ]                | id( $fragment-id )                 | $theDocument_1//*[@id= $fragment-id ]"/>
                             <xsl:if test="not($theFragment_1)">
@@ -991,13 +819,7 @@
         <xsl:processing-instruction name="DSDL_INCLUDE_END">
             <xsl:value-of select="@xlink:href"/>
         </xsl:processing-instruction>
-    </xslt:template>
-
-<!-- ================================================================= -->
-<!-- UTILITY TEMPLATES                                                 -->
-<!-- ================================================================= -->
-
-<!-- MESSAGE WHEN XPATH NOT WELL FORMED -->
+    </xslt:template><!-- ================================================================= --><!-- UTILITY TEMPLATES                                                 --><!-- ================================================================= --><!-- MESSAGE WHEN XPATH NOT WELL FORMED -->
     <xsl:template name="sch-check:xpath-wf-message">
         <xsl:param name="string"/>
         <xsl:param name="subject"/>
@@ -1012,12 +834,9 @@
                 <xsl:value-of select="$xpath-wf-result"/>
             </xsl:message>
         </xsl:if>
-    </xsl:template>
- 
-<!-- XPATH WELL FORMED -->
+    </xsl:template><!-- XPATH WELL FORMED -->
     <xsl:template name="sch-check:xpath-wf">
-        <xsl:param name="string"/>
-   <!-- This does some minimal checks to see if a string is well-formed XPath.
+        <xsl:param name="string"/><!-- This does some minimal checks to see if a string is well-formed XPath.
    It checks 
       1) String is not empty, 
       2) equal number of open and close parens
@@ -1049,8 +868,7 @@
             <xsl:when test="string-length( normalize-space($string)) = 0">XPath error. No XPath.</xsl:when>
             <xsl:when test="contains( $stripped-contents, '/[' )">XPath error. Missing location step. Suggestion: remove '/' before '['.
       <xsl:value-of select=" normalize-space($string)"/>
-            </xsl:when>
-      <!-- not implemented yet 
+            </xsl:when><!-- not implemented yet 
       <xsl:when test=" count () mod 2 = 1" 
       >XPath syntax error. Odd number of apostrophe characters. Suggestion: check string termination and delimiting.
       <xsl:value-of select=" normalize-space($string)"/></xsl:when>
@@ -1071,15 +889,10 @@
       <xsl:value-of select=" normalize-space($string)"/>
             </xsl:when>
         </xsl:choose>
-    </xsl:template> 
-
-
-<!--  STRIP XPATH STRINGS -->
+    </xsl:template><!--  STRIP XPATH STRINGS -->
     <xsl:template name="sch-check:strip-strings">
         <xsl:param name="string"/>
-        <xsl:param name="mode"/>
-  
-  <!-- 
+        <xsl:param name="mode"/><!-- 
     mode 0 =  outside string 
     mode 1 = in double quote string 
     mode 2 = in single quote string
@@ -1109,9 +922,7 @@
                 </xsl:choose>
             </xsl:when>
             <xsl:when test="$mode = 2 ">
-                <xsl:choose> 
-     
-          <!-- doubled double quote or double apos is an escape  -->
+                <xsl:choose><!-- doubled double quote or double apos is an escape  -->
                     <xsl:when test="starts-with( $string, &#34;''&#34;) ">
                         <xsl:call-template name="sch-check:strip-strings">
                             <xsl:with-param name="string" select="  substring ( $string, 3 )"/>
@@ -1132,7 +943,7 @@
                     </xsl:otherwise>
                 </xsl:choose>
             </xsl:when>
-            <xsl:otherwise> <!-- mode = 0 -->
+            <xsl:otherwise><!-- mode = 0 -->
                 <xsl:choose>
                     <xsl:when test="starts-with( $string, '&#34;')">
                         <xsl:call-template name="sch-check:strip-strings">
@@ -1156,10 +967,7 @@
                 </xsl:choose>
             </xsl:otherwise>
         </xsl:choose>
-    </xsl:template>  
- 
- <!--  COUNT THE NUMBER OF UNMATCHED PARENTHESES -->
- <!-- Limitation: Does not check balancing. -->
+    </xsl:template><!--  COUNT THE NUMBER OF UNMATCHED PARENTHESES --><!-- Limitation: Does not check balancing. -->
     <xsl:template name="sch-check:test-paren">
         <xsl:param name="string"/>
         <xsl:param name="count"/>
@@ -1186,11 +994,7 @@
                 </xsl:call-template>
             </xsl:otherwise>
         </xsl:choose>
-    </xsl:template>
-
-
- <!--  COUNT THE NUMBER OF SQUARE BRACKETS -->
- <!-- Limitation: Does not check balancing. -->
+    </xsl:template><!--  COUNT THE NUMBER OF SQUARE BRACKETS --><!-- Limitation: Does not check balancing. -->
     <xsl:template name="sch-check:test-sqb">
         <xsl:param name="string"/>
         <xsl:param name="count"/>

@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- (: Copyright 2012 Geordie Springfield Pty Ltd Australia :) -->
-<xsl:stylesheet xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
-    
-    <!-- 
+<xsl:stylesheet xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0"><!-- 
             Output functions - discussion: 
             
                     Use a global namespace for Output names.
@@ -13,9 +11,7 @@
                     member:coordinator_person{"first-and-last":= function($context) {...} etc. Or something like that.
                     OH - but hang on. Here it's just a name. This is complex.
                     
-                -->
-    
-    <!--  This file is a generator for the final part of the Merge process. Each template will have an XQuery generated using this file. 
+                --><!--  This file is a generator for the final part of the Merge process. Each template will have an XQuery generated using this file. 
           If the template is 
                /tenants/xxx/template/path/to/Template.docx then this file will be 
           /tenants/xxx/template-meta/path/to/Template_docx/merge.xql
@@ -62,13 +58,13 @@
     And the output of that process will be passed to the next output. Hmm.
      -->
     <xsl:output method="xml" cdata-section-elements="" omit-xml-declaration="yes"/>
-    <xsl:param name="path-to-schema-col" required="yes"/> <!-- e.g /db/pekoe/files/education/schemas/school-booking.xml -->
-    <xsl:param name="template-file" required="yes"/>  <!-- e.g /db/pekoe/templates/Education/Concession-ticket-2a.docx-->
+    <xsl:param name="path-to-schema-col" required="yes"/><!-- e.g /db/pekoe/files/education/schemas/school-booking.xml -->
+    <xsl:param name="template-file" required="yes"/><!-- e.g /db/pekoe/templates/Education/Concession-ticket-2a.docx-->
     <xsl:param name="tenant" required="yes"/>
     <xsl:param name="template-meta-path" required="yes"/>
-    <xsl:variable name="schema-type" select="/links/string(@for)"/> <!-- e.g. "schools", "school-booking", "properties", "schema" -->
-    <xsl:variable name="doctype" select="/links/string(@template-type)"/> <!--  "docx", "html" or "txt" -->
-    <xsl:variable name="doctype-module" select="concat('merge-',$doctype)"/> <!-- pekoe-docx - to distinguish it from other things.-->
+    <xsl:variable name="schema-type" select="/links/string(@for)"/><!-- e.g. "schools", "school-booking", "properties", "schema" -->
+    <xsl:variable name="doctype" select="/links/string(@template-type)"/><!--  "docx", "html" or "txt" -->
+    <xsl:variable name="doctype-module" select="concat('merge-',$doctype)"/><!-- pekoe-docx - to distinguish it from other things.-->
     <xsl:template match="/">
 (: 
    This is a Pekoe Merge XQuery for the Template <xsl:value-of select="$template-file"/>
@@ -87,8 +83,7 @@
 xquery version "3.0";     
 
 import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions" at "xmldb:exist:///db/apps/pekoe/templates/common-output-functions.xqm";
-<!-- The Schema module containing the output functions -->
-        <!-- will need to change the namespace to make it tenant-specific -->
+<!-- The Schema module containing the output functions --><!-- will need to change the namespace to make it tenant-specific -->
 import module namespace <xsl:value-of select="$schema-type"/>="http://www.gspring.com.au/schema-module/<xsl:value-of select="$schema-type"/>" 
         at "xmldb:exist://<xsl:value-of select="$path-to-schema-col"/>/<xsl:value-of select="$schema-type"/>.xqm";
 <!-- the doctype module -->
@@ -121,11 +116,8 @@ declare function local:collect-values($job) {
     (: your site file must determine how to proceed - perhaps based on some parameter. :)
     return site:delivery($job, "<xsl:value-of select="$template-file"/>", $merged-content)
         
-<!--    return <xsl:value-of select="$doctype-module" />:merge($intermediate, "<xsl:value-of select="replace($template-file, '/db/pekoe/templates(.*)\.docx$','/db/pekoe/config/template-content$1.xml')"  />", $job-id)     -->
-    <!-- See discussion in Chasewater about OUTPUT SCENARIOS -->
-    </xsl:template>
-    
-    <!--  GENERATE this:
+<!--    return <xsl:value-of select="$doctype-module" />:merge($intermediate, "<xsl:value-of select="replace($template-file, '/db/pekoe/templates(.*)\.docx$','/db/pekoe/config/template-content$1.xml')"  />", $job-id)     --><!-- See discussion in Chasewater about OUTPUT SCENARIOS -->
+    </xsl:template><!--  GENERATE this:
         <link ph-name="School-address" field-path="/school-booking/school" output-name="address-on-one-line">
             { let $context := $job/school-booking/school
               return school-booking:address-on-one-line($context)    
@@ -194,10 +186,7 @@ declare function local:collect-values($job) {
             <xsl:attribute name="run-date">{current-dateTime()}</xsl:attribute>
             <xsl:apply-templates select="node()"/>
         </xsl:copy>
-    </xsl:template>
-    
-    
-    <!-- Create a copy of the LINK, with the appropriate script to generate the output - e.g. 
+    </xsl:template><!-- Create a copy of the LINK, with the appropriate script to generate the output - e.g. 
             {                    
             let $var0 := $job/residential/purchaser/person
             let $var1 := residential:full-name($var0)
@@ -211,10 +200,9 @@ declare function local:collect-values($job) {
             <xsl:apply-templates select="@original-href"/>
             <xsl:apply-templates select="@placeholder"/>
         {<xsl:choose>
-                <xsl:when test="empty(./xquery) and $output-functions eq 0"> <!-- this is a value result.  -->
+                <xsl:when test="empty(./xquery) and $output-functions eq 0"><!-- this is a value result.  -->
             $job<xsl:value-of select="@field-path"/>
-                </xsl:when>
-            <!-- 
+                </xsl:when><!-- 
                 I would like to use the xquery AND outputs in a chain. The problem is that outputs are functions (in the schema-module)
                 while the xquery expects to operate on the $path.
                 
@@ -256,18 +244,14 @@ declare function local:collect-values($job) {
                             </xsl:otherwise>
                         </xsl:choose>
                     </xsl:for-each>
-            return <xsl:value-of select="$lastOutput"/>
-<!-- return $output2 -->
+            return <xsl:value-of select="$lastOutput"/><!-- return $output2 -->
                 </xsl:otherwise>
             </xsl:choose>
             }
         </link>
     </xsl:template>
     <xsl:template match="output-or-xquery"/>
-    <xsl:template match="command"/>
-
-    
-    <!-- OLD VERSION -->
+    <xsl:template match="command"/><!-- OLD VERSION -->
     <xsl:template match="node() | @*">
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>

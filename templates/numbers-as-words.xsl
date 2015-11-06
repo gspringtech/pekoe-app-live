@@ -16,8 +16,7 @@
                 </xsl:call-template>
             </currency-string>
             <number-in-words>
-                <xsl:call-template name="makeWords">
-                    <!-- Split into integer and decimal -->
+                <xsl:call-template name="makeWords"><!-- Split into integer and decimal -->
                     <xsl:with-param name="theNumber" select="floor(abs($input))"/>
                 </xsl:call-template>
                 <xsl:choose>
@@ -33,8 +32,7 @@
                     <xsl:if test="$input gt 1">
                         <xsl:value-of select="//conjunctions/join[@id = 'integer-to-decimal']"/>
                     </xsl:if>
-                    <xsl:call-template name="makeWords">
-                        <!-- Split into integer and decimal -->
+                    <xsl:call-template name="makeWords"><!-- Split into integer and decimal -->
                         <xsl:with-param name="theNumber" select="$cents"/>
                     </xsl:call-template>
                     <xsl:choose>

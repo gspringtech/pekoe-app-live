@@ -45,9 +45,7 @@
                 
             </xd:p>
         </xd:desc>
-    </xd:doc>
-    
-    <!-- This allows me to write xsl instructions in the output document -->
+    </xd:doc><!-- This allows me to write xsl instructions in the output document -->
     <xsl:namespace-alias stylesheet-prefix="xso" result-prefix="xsl"/>
     <xsl:variable name="schema-root" select="string(/schema/@for)"/><!-- functions are in the namespace of the schema-root -->
     <xsl:template match="/schema">
@@ -58,9 +56,7 @@
             <xso:include href="/db/pekoe-system/common.xsl"/>
             <xsl:apply-templates/>
         </xso:stylesheet>
-    </xsl:template>
-    
-    <!--
+    </xsl:template><!--
         A TABLE needs to have a wrapper (created by  the template-stylesheet-generator) 
         Pass a param with the index-position number - or just run in a for-loop and make sure the CONTEXT is correct
         for-each??
@@ -68,19 +64,15 @@
         -->
     <xsl:template match="output[not(ancestor::fragment) and string(xpath) ne '']">
         <xso:function name="{$schema-root}:{string(./@name)}">
-            <xso:param name="path"/> <!-- this param is made available to the script -->
+            <xso:param name="path"/><!-- this param is made available to the script -->
             <xsl:comment>Has output xpath</xsl:comment>
             <xso:value-of select="{string(xpath)}"/>
         </xso:function>
-    </xsl:template>
-    
-<!--    <xsl:template match="output[not(ancestor::fragment) and string(xpath) eq '']">
+    </xsl:template><!--    <xsl:template match="output[not(ancestor::fragment) and string(xpath) eq '']">
         <xso:function name="{$schema-root}:{string(../@path)}" >
             <xso:value-of select="{../@path}"/>
         </xso:function>
-    </xsl:template>-->
-    
-<!--    <xsl:template match="output[ancestor::fragment]">
+    </xsl:template>--><!--    <xsl:template match="output[ancestor::fragment]">
          
     </xsl:template>-->
     <xsl:template match="node()">

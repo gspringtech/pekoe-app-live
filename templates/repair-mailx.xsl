@@ -8,8 +8,7 @@
                 <xd:b>Author:</xd:b> Alister Pillow</xd:p>
             <xd:p>Replace placeholders {{ph-name}} with hyperlinks.</xd:p>
         </xd:desc>
-    </xd:doc>
-    <!-- match {{org-name}} or similar.  -->
+    </xd:doc><!-- match {{org-name}} or similar.  -->
     <xsl:variable name="match">\{\{([^}]+)\}\}</xsl:variable>
     <xsl:variable name="root" select="/"/>
     <xsl:key name="links" match="link" use="string(id)"/>
@@ -17,9 +16,7 @@
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>
         </xsl:copy>
-    </xsl:template>
-    
-    <!-- 
+    </xsl:template><!-- 
     In this template, fields are represented by placeholders in the text:
     Dear {{first-name}}, 
     etc
@@ -27,7 +24,7 @@
     
     Replace these placeholders with standard hyperlinks which can be more easily processed.
     -->
-    <xsl:template match="link"/> <!-- delete the links from the output -->
+    <xsl:template match="link"/><!-- delete the links from the output -->
     <xsl:template match="text()[contains(.,'{{')]">
         <xsl:analyze-string select="." regex="{$match}">
             <xsl:matching-substring>

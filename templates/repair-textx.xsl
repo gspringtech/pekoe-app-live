@@ -16,9 +16,7 @@
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>
         </xsl:copy>
-    </xsl:template>
-    
-    <!-- 
+    </xsl:template><!-- 
     In this template, fields are represented by placeholders in the text:
     Dear {{first-name}}, 
     etc
@@ -26,7 +24,7 @@
     
     Replace these placeholders with standard hyperlinks which can be more easily processed.
     -->
-    <xsl:template match="link"/> <!-- delete the links from the output -->
+    <xsl:template match="link"/><!-- delete the links from the output -->
     <xsl:template match="content/text()[contains(.,'{{')]">
         <xsl:analyze-string select="." regex="{$match}">
             <xsl:matching-substring>
@@ -39,24 +37,16 @@
             </xsl:non-matching-substring>
         </xsl:analyze-string>
     </xsl:template>
-    <xsl:template match="node() | @*" mode="delete"/>
-    
-    <!-- TODO - Incorporate this... -->
-    <!-- Emit text, 75 character max per line, recursively -->
-    <!-- Thanks to Tim Hare 2005 from the ical2ics stylesheet  -->
+    <xsl:template match="node() | @*" mode="delete"/><!-- TODO - Incorporate this... --><!-- Emit text, 75 character max per line, recursively --><!-- Thanks to Tim Hare 2005 from the ical2ics stylesheet  -->
     <xsl:template name="emit_text">
-        <xsl:param name="limit" select="number(75)"/>
-        <!-- default limit is 75 " -->
+        <xsl:param name="limit" select="number(75)"/><!-- default limit is 75 " -->
         <xsl:param name="line"/>
-        <xsl:value-of select="substring(normalize-space($line),1,$limit)"/>
-        <!-- Output the newline string -->
-        <xsl:text>
-</xsl:text>
+        <xsl:value-of select="substring(normalize-space($line),1,$limit)"/><!-- Output the newline string -->
+        <xsl:text/>
         <xsl:if test="string-length($line) &gt; $limit">
-            <xsl:text> </xsl:text>
+            <xsl:text/>
             <xsl:call-template name="emit_text">
-                <xsl:with-param name="limit" select="($limit - 1)"/>
-                <!-- use 74 allow for space -->
+                <xsl:with-param name="limit" select="($limit - 1)"/><!-- use 74 allow for space -->
                 <xsl:with-param name="line" select="substring($line,($limit + 1))"/>
             </xsl:call-template>
         </xsl:if>

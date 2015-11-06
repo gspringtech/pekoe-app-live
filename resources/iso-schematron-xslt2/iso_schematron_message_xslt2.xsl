@@ -26,12 +26,7 @@
     <xsl:import href="iso_schematron_skeleton_for_saxon.xsl"/>
     <xsl:template name="process-prolog">
         <axsl:output method="text"/>
-    </xsl:template>
-
-<!-- use default rule for process-root:  copy contens / ignore title -->
-<!-- use default rule for process-pattern: ignore name and see -->
-<!-- use default rule for process-name:  output name -->
-<!-- use default rule for process-assert and process-report:
+    </xsl:template><!-- use default rule for process-root:  copy contens / ignore title --><!-- use default rule for process-pattern: ignore name and see --><!-- use default rule for process-name:  output name --><!-- use default rule for process-assert and process-report:
      call process-message -->
     <xsl:template name="process-message">
         <xsl:param name="pattern"/>

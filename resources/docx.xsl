@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xso="dummy" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs" version="2.0">
-    
-    <!-- This allows me to write xsl instructions in the output document -->
-    <xsl:namespace-alias stylesheet-prefix="xso" result-prefix="xsl"/>
-    <!-- 
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xso="dummy" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs" version="2.0"><!-- This allows me to write xsl instructions in the output document -->
+    <xsl:namespace-alias stylesheet-prefix="xso" result-prefix="xsl"/><!-- 
         Transform a DOCX into a pull-transform stylesheet
     -->
     <xsl:param name="links-doc"/>
@@ -21,9 +18,7 @@
             <xsl:namespace name="pekoe">http://www.gspring.com.au/pekoe</xsl:namespace>
             <xsl:apply-templates/>
         </xsl:copy>
-    </xsl:template>
-    
-    <!-- 
+    </xsl:template><!-- 
         w:fldSimple is the easiest of the crappy Word markups (and look how stupid it is!)
         option 1: get the field name from the text: w:t
         option 2: parse the @w:instr 
@@ -55,9 +50,7 @@
         
         - make all outputs have a name and a value?
         - 
-    -->
-    
-    <!-- 
+    --><!-- 
         A MAJOR FLAW 
         in this approach (putting the xpaths into the <template>.xsl is that if the SCHEMA CHANGES, 
         the templates may need to be recompiled. 
@@ -76,13 +69,10 @@
         
         -->
     <xsl:template match="w:t" mode="field">
-        <xsl:variable name="fName" select="replace(., '«|»','')"/> <!-- Get the mergefield NAME -->
-        <xsl:variable name="ph-link" select="doc($links-doc)//link[@ph-name eq $fName]"/> <!--find associated Link -->
-        <xsl:variable name="fPath" select="$ph-link/string(@field-path)"/> <!-- Link provides Field XPath -->
-        <xsl:variable name="output-name" select="$ph-link/string(@output-name)"/> <!-- ... and (optional) Named Output -->
-
-        
-        <!-- VERY TRICKY: 
+        <xsl:variable name="fName" select="replace(., '«|»','')"/><!-- Get the mergefield NAME -->
+        <xsl:variable name="ph-link" select="doc($links-doc)//link[@ph-name eq $fName]"/><!--find associated Link -->
+        <xsl:variable name="fPath" select="$ph-link/string(@field-path)"/><!-- Link provides Field XPath -->
+        <xsl:variable name="output-name" select="$ph-link/string(@output-name)"/><!-- ... and (optional) Named Output --><!-- VERY TRICKY: 
             by design, this version of the schema allows output-scripts to have common names. (e.g. address-on-one-line)
             This DOES NOT imply that the script is the SAME. (e.g. some kind of "last" value or "sum")
             So the correct output is field dependent:
@@ -94,10 +84,7 @@
             
             Biggest problem with this at the moment is the lack of useful inputs and outputs. 
             I think I'll have to re-work the txo-schema.
-        -->
-        
-<!--        <xsl:variable name="full-path" select="if ($output-name ne '') then concat($fPath, '/',$output-name) else"></xsl:variable>-->
-        <!-- 
+        --><!--        <xsl:variable name="full-path" select="if ($output-name ne '') then concat($fPath, '/',$output-name) else"></xsl:variable>--><!-- 
             TODO: change this so that it tests for an absolute path. 
         -->
         <xsl:copy>

@@ -45,9 +45,7 @@ It's doesn't affect the template.xql.
 module namespace ps="http://www.gspring.com.au/schema-module/<xsl:value-of select="$schema-root"/>";
 import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions" at "xmldb:exist://db/apps/pekoe/templates/common-output-functions.xqm";
 <xsl:apply-templates/>
-    </xsl:template>
-    
-    <!--
+    </xsl:template><!--
         A TABLE needs to have a wrapper (created by  the template-stylesheet-generator) 
         Pass a param with the index-position number - or just run in a for-loop and make sure the CONTEXT is correct
         for-each??
@@ -78,9 +76,7 @@ import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions"
 declare function ps:<xsl:value-of select="string(@name)"/> ($path) {
         <xsl:copy-of select="./xpath/(* | text())"/> 
 };
-    </xsl:template>
-    
-<!--    <xsl:template match="output[ancestor::fragment]">
+    </xsl:template><!--    <xsl:template match="output[ancestor::fragment]">
          
     </xsl:template>-->
     <xsl:template match="node()">

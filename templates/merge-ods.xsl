@@ -40,7 +40,7 @@
     <xsl:output method="xml" cdata-section-elements="" omit-xml-declaration="yes"/>
     <xsl:param name="template-content"/>
     <xsl:variable name="path-to-template-content" select="concat('xmldb:exist://', $template-content )"/>
-    <xsl:variable name="phlinks" select="/links"/> <!--  a reference to the root is needed because another document is imported. -->
+    <xsl:variable name="phlinks" select="/links"/><!--  a reference to the root is needed because another document is imported. -->
     <xsl:template match="/">
         <xsl:choose>
             <xsl:when test="doc-available($path-to-template-content)">

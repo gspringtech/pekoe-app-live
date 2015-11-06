@@ -61,19 +61,10 @@
  3. This notice may not be removed or altered from any source distribution.
 -->
 <xslt:stylesheet xmlns:nvdl="http://purl.oclc.org/dsdl/nvdl" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:iae="http://www.schematron.com/namespace/iae" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xslt="http://www.w3.org/1999/XSL/Transform" version="1.0">
-    <xslt:param name="schema-id"/>
-	
-	
-	<!-- Driver for the mode -->
+    <xslt:param name="schema-id"/><!-- Driver for the mode -->
     <xsl:template match="/">
         <xsl:apply-templates select="." mode="iae:go"/>
-    </xsl:template> 
-	
-	
-	<!-- ================================================================================== -->
-	<!-- Normal processing rules                                                            -->
-	<!-- ================================================================================== -->
-	<!-- Output only the selected schema -->
+    </xsl:template><!-- ================================================================================== --><!-- Normal processing rules                                                            --><!-- ================================================================================== --><!-- Output only the selected schema -->
     <xslt:template match="iso:schema">
         <xsl:if test="string-length($schema-id) =0 or @id= $schema-id ">
             <xslt:copy>
@@ -81,26 +72,15 @@
                 <xslt:apply-templates mode="iae:go"/>
             </xslt:copy>
         </xsl:if>
-    </xslt:template>
-	
- 
-	<!-- Strip out any foreign elements above the Schematron schema .
+    </xslt:template><!-- Strip out any foreign elements above the Schematron schema .
 		-->
     <xslt:template match="*[not(ancestor-or-self::iso:*)]" mode="iae:go">
         <xslt:apply-templates mode="iae:go"/>
-    </xslt:template>
-	   
-	
-	<!-- ================================================================================== -->
-	<!-- Handle Schematron abstract pattern preprocessing                                   -->
-	<!-- abstract-to-real calls
+    </xslt:template><!-- ================================================================================== --><!-- Handle Schematron abstract pattern preprocessing                                   --><!-- abstract-to-real calls
 			do-pattern calls 
 				macro-expand calls 
 					multi-macro-expand
-						replace-substring                                                   -->
-	<!-- ================================================================================== -->
-	
-	<!--
+						replace-substring                                                   --><!-- ================================================================================== --><!--
 		Abstract patterns allow you to say, for example
 		
 		<pattern name="htmlTable" is-a="table">
@@ -115,15 +95,10 @@
 		However, note that ISO Schematron uses @name and @value attributes on
 		the iso:param element, and @id not @name on the pattern element.
 		
-	-->
-	
-	<!-- Suppress declarations of abstract patterns -->
+	--><!-- Suppress declarations of abstract patterns -->
     <xslt:template match="iso:pattern[@abstract='true']" mode="iae:go">
         <xslt:comment>Suppressed abstract pattern <xslt:value-of select="@id"/> was here</xslt:comment>
-    </xslt:template> 
-	
-	
-	<!-- Suppress uses of abstract patterns -->
+    </xslt:template><!-- Suppress uses of abstract patterns -->
     <xslt:template match="iso:pattern[@is-a]" mode="iae:go">
         <xslt:comment>Start pattern based on abstract <xslt:value-of select="@is-a"/>
         </xslt:comment>
@@ -131,20 +106,13 @@
             <xslt:with-param name="caller" select="@id"/>
             <xslt:with-param name="is-a" select="@is-a"/>
         </xslt:call-template>
-    </xslt:template>
-	 
-	 
-	
-	<!-- output everything else unchanged -->
+    </xslt:template><!-- output everything else unchanged -->
     <xslt:template match="*" priority="-1" mode="iae:go">
         <xslt:copy>
             <xslt:copy-of select="@*"/>
             <xslt:apply-templates mode="iae:go"/>
         </xslt:copy>
-    </xslt:template>
-	
-	<!-- Templates for macro expansion of abstract patterns -->
-	<!-- Sets up the initial conditions for the recursive call -->
+    </xslt:template><!-- Templates for macro expansion of abstract patterns --><!-- Sets up the initial conditions for the recursive call -->
     <xslt:template name="iae:macro-expand">
         <xslt:param name="caller"/>
         <xslt:param name="text"/>
@@ -153,9 +121,7 @@
             <xslt:with-param name="text" select="$text"/>
             <xslt:with-param name="paramNumber" select="1"/>
         </xslt:call-template>
-    </xslt:template>
-	
-	<!-- Template to replace the current parameter and then
+    </xslt:template><!-- Template to replace the current parameter and then
 	   recurse to replace subsequent parameters. -->
     <xslt:template name="iae:multi-macro-expand">
         <xslt:param name="caller"/>
@@ -179,10 +145,7 @@
                 <xslt:value-of select="$text"/>
             </xslt:otherwise>
         </xslt:choose>
-    </xslt:template>
-	
-	
-	<!-- generate the real pattern from an abstract pattern + parameters-->
+    </xslt:template><!-- generate the real pattern from an abstract pattern + parameters-->
     <xslt:template name="iae:abstract-to-real">
         <xslt:param name="caller"/>
         <xslt:param name="is-a"/>
@@ -207,10 +170,7 @@
                 </xslt:apply-templates>
             </xslt:copy>
         </xslt:for-each>
-    </xslt:template>
-		
-	
-	<!-- Generate a non-abstract pattern -->
+    </xslt:template><!-- Generate a non-abstract pattern -->
     <xslt:template mode="iae:do-pattern" match="*">
         <xslt:param name="caller"/>
         <xslt:copy>
@@ -228,8 +188,7 @@
             </xslt:for-each>
             <xslt:copy-of select="@*[name()!='test'][name()!='context'][name()!='select']"/>
             <xsl:for-each select="node()">
-                <xsl:choose>
-				    <!-- Experiment: replace macros in text as well, to allow parameterized assertions
+                <xsl:choose><!-- Experiment: replace macros in text as well, to allow parameterized assertions
 				        and so on, without having to have spurious <iso:value-of> calls and multiple
 				        delimiting -->
                     <xsl:when test="self::text()">
@@ -252,10 +211,7 @@
                 </xsl:choose>
             </xsl:for-each>
         </xslt:copy>
-    </xslt:template>
-	
-	<!-- UTILITIES --> 
-	<!-- Simple version of replace-substring function -->
+    </xslt:template><!-- UTILITIES --><!-- Simple version of replace-substring function -->
     <xslt:template name="iae:replace-substring">
         <xslt:param name="original"/>
         <xslt:param name="substring"/>
@@ -269,16 +225,14 @@
                 <xsl:variable name="before" select="substring-before($original, $substring)"/>
                 <xsl:variable name="after" select="substring-after($original, $substring)"/>
                 <xsl:value-of select="$before"/>
-                <xsl:value-of select="$replacement"/>
-          <!-- recursion -->
+                <xsl:value-of select="$replacement"/><!-- recursion -->
                 <xsl:call-template name="iae:replace-substring">
                     <xsl:with-param name="original" select="$after"/>
                     <xsl:with-param name="substring" select="$substring"/>
                     <xsl:with-param name="replacement" select="$replacement"/>
                 </xsl:call-template>
             </xsl:when>
-            <xsl:otherwise>
-        	<!-- no substitution -->
+            <xsl:otherwise><!-- no substitution -->
                 <xsl:value-of select="$original"/>
             </xsl:otherwise>
         </xsl:choose>
