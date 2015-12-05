@@ -1,4 +1,4 @@
-xquery version "3.0"; 
+xquery version "3.1"; 
 
 import module namespace tmpl     ="http://www.gspring.com.au/pekoe/admin-interface/templates" at "modules/templates.xqm";
 
@@ -18,12 +18,11 @@ declare variable $local:defaults := collection($local:tenant-path || "/templates
 
 declare function local:list() as element() {
     let $default-templates := map:new(for $default-link in $local:defaults return map{$default-link/string(@for) : $default-link/string(@default-template) })
-(:    let $debug := for $k in map:keys($default-templates) return util:log('info','KEY: ' || $k || ': ' || $default-templates($k) ):)
+    let $debug := for $k in map:keys($default-templates) return util:log('info','KEY: ' || $k || ': ' || $default-templates($k) )
     let $common-templates := tmpl:get-simple-listing($local:common-templates-path,$default-templates)
     let $simple-listing := tmpl:get-simple-listing($local:templates-path, $default-templates)
     return <ul class='hiernav'>{$common-templates,$simple-listing}</ul> 
 }; 
-
 
 
 (: --------------------------------------------------      MAIN QUERY      ------------------------- :)
