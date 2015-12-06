@@ -1,5 +1,5 @@
 xquery version "3.0";
-
+(: Currently still used by 'schema.xql' for displaying the schema-paths page.  :)
 (:
     Provides
     breadcrumbs($base, $path)

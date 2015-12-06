@@ -6,6 +6,13 @@ declare variable $pekoe:aust-short-date := "[D01]-[M01]-[Y]";
 declare variable $pekoe:aust-long-date := "[D1o] [MNn], [Y]";
 declare variable $pekoe:aust-medium-date := "[D1o] [MNn], [Y]";
 
+declare function pekoe:space-join($d) {
+    string-join($d,' ')
+};
+
+declare function pekoe:and-join($d) {
+    string-join($d,' and ')
+};
 
 declare function pekoe:aust-short-date ($d) {
     if ($d castable as xs:date) then format-date($d,$pekoe:aust-short-date)

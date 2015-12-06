@@ -32,7 +32,8 @@ let $default-content := lw:configure-content-map($conf)
 
 
 let $content :=  map:new(($default-content,  map {
-    'title' : 'Pekoe Patterns',
+    'title' : 'Issues and Requests',
+    'allow-export' : true(),
     'column-headings': ['Title', 'Reporter', 'Applies to', 'Last Comment', 'Created', 'Resolved'], 
     'doctype' : $local:doctype,
     'path-to-me' : '/exist/pekoe-app/Issues.xql',
@@ -114,6 +115,6 @@ Need some more examples to test.
                 
 })) (: end of map:new :)
 
-return lw:list-page($content)
+return lw:process($content)
 
 
