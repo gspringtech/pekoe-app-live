@@ -467,7 +467,9 @@ declare function lw:pagination($pagination-map) {
                 return (
                 (: Go First :)                    <li>{$disabled-fn(1)     }<a title='First'    href="?{$p-fn(1)     }"><i class='fa fa-angle-double-left'></i></a></li>,
                 (: Go Prev :)                     <li>{$disabled-fn(1)     }<a title='Previous' href="?{$p-fn(if ($current ne 1) then $current - 1 else ())}"><i class='fa fa-angle-left'></i></a></li>,
-                (for $n in $first to $last return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$p-fn($n)}'>{$n}</a></li>),
+                                            (for $n in $first to $last return 
+                                                  <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$p-fn($n)}'>{$n}</a></li>
+                                            ),
                 (: Go Next :)                     <li>{$disabled-fn($total)}<a title='Next'     href="?{$p-fn(if ($current eq $total) then $current else $current + 1)}"><i class='fa fa-angle-right'></i></a></li>,
                 (: Go Last :)                     <li>{$disabled-fn($total)}<a title='Last'     href="?{$p-fn($total)}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>
                 )
@@ -934,6 +936,16 @@ return
   </div>
 </div>
 {if (map:contains($content, 'custom-script') and $content?custom-script instance of function(*)) then $content?custom-script($content) else ()}
+{if (map:contains($content, 'extra-content-url')) then <script>
+    $(function (){{
+        if ( gs.scope) {{
+            if (gs.scope.tab.extra === '') {{
+                gs.scope.tab.extra = '{$content?extra-content-url}';
+                gs.scope.$apply(); // this will force an update. 
+            }}
+            }}
+    }});
+</script> else () }
 </body>
 </html>
 
