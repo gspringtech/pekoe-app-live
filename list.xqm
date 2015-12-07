@@ -30,9 +30,11 @@ module namespace lw = "http://pekoe.io/list/wrapper";
 import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
 import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/apps/pekoe/modules/tenant.xqm";
 
+declare variable $lw:screen := request:get-cookie-value('screenx') || 'x' || request:get-cookie-value('screeny'); 
 declare variable $lw:action := request:get-parameter("action","List"); (: Must have useful default for when activated by browse-list:)
 declare variable $lw:method := request:get-method();
 
+declare variable $lw:DEFAULT-LIST-SIZE := 20;
 
 declare variable $lw:aust-dateTime-picture :=  "[D01] [M01] [Y0001] [H01]:[m01]:[s01]";
 declare variable $lw:aust-date-picture :=   "[D01]/[M01]/[Y0001]";
@@ -54,6 +56,7 @@ declare function lw:configure-content-map($config-map) {
     (: Must provide defaults for these.   :)
     let $base-map := map {
         'show-footer' : false(),
+        'allow-export' : false(),                                       (: Default prevents the button from appearing and also prevents user from trying ?download :)
         'doctype' : function ($item) { () },                            (: a default returning empty must be provided because it's a function. :)
         'display-title' : function($item) { $item/*[1]/string() }       (: the string-value of the first child element will be the default title of a new Tab for 'this item'. :)
     }
@@ -312,6 +315,45 @@ declare function lw:doc-permissions($file-path) {
     </div>    
 ];:)
 
+
+declare function lw:update-list-pref($user, $list, $name, $value, $element) {
+    (:  *** PUT THE SCREEN SIZE INTO the LIST PREF - so it can be different on different screens. :)
+    if ($element) then update value $element with $value
+    else 
+        
+        let $config-path := $tenant:tenant-path || '/config/users'
+        let $conf := collection($config-path)/config[@for eq $user]
+        return
+            if ($conf//list[@eff-uri eq $list]) (: the element doesn't exist so look for its list       :)
+            then (update insert element {$name} {$value} into $conf//list[@eff-uri eq $list] ) 
+            else (: the list doesn't exist so look for its pref :)
+                if ($conf/pref[@for eq 'lists']) 
+                then update insert <list eff-uri='{$list}'>{element {$name} {$value}}</list> into $conf/pref[@for eq 'lists']
+                else 
+                    if ($conf) then update insert <pref for='lists'>{<list eff-uri='{$list}'>{element {$name} {$value}}</list>}</pref> into $conf
+                    else 
+                        xmldb:store($config-path, replace($user, "[\W]+","_") || '.xml', <config for='{$user}'>{ <pref for='lists'>{<list eff-uri='{$list}'>{element {$name} {$value}}</list>}</pref>}</config>)
+
+};
+
+
+(: See *** below.:)
+declare function lw:preferred-list-rpp() { 
+    let $eff-uri := request:get-effective-uri() || $lw:screen
+    let $current-rpp := request:get-parameter('rpp','')
+    let $current-user := sm:id()//sm:real/sm:username/string()
+    let $config-path := $tenant:tenant-path || '/config/users'
+    let $stored-pref := collection($config-path)/config[@for eq $current-user]/pref[@for eq 'lists']/list[@eff-uri eq $eff-uri]/rpp 
+    let $rpp := 
+        if ($current-rpp ne '') then         (: Update the stored pref and return the value:) 
+            let $update := if (string($stored-pref) ne $current-rpp) then (lw:update-list-pref($current-user, $eff-uri, 'rpp', $current-rpp, $stored-pref)) else ()
+            return $current-rpp
+        else if ($stored-pref ne '') then $stored-pref
+        else $lw:DEFAULT-LIST-SIZE
+    return xs:integer($rpp)
+};
+
+
 (:~
 : @param $params - the static uri parameters for the breadcrumb link
 : @items - the sequence of things that will be paginated. Expected to be nodes of some kind.
@@ -333,7 +375,8 @@ declare function lw:pagination-map($content) {
     let $items := $content?items
     
 (: items, rpp, start, end, current, total, params :)
-    let $records-per-page := local:get-request-as-number("rpp",20)
+    
+    let $records-per-page := lw:preferred-list-rpp() (: ***  It would be preferable to make this device dependent :)
     let $current-page := local:get-request-as-number("p",1)
     let $count := count($items)
     let $total-pages := xs:integer(ceiling($count div $records-per-page))
@@ -353,6 +396,7 @@ declare function lw:pagination-map($content) {
     return map:new(($content, map {'pagination-map': $pages-map}))
 };
 
+
 (: '/exist/pekoe-app/files.xql?collection=', $lw:quarantined-path e.g. /files/AD-Bookings.xql :)
 (: Note - See Tabular-data.xql for an alternative.   :)
 declare function lw:breadcrumbs($base, $path) {
@@ -363,46 +407,79 @@ declare function lw:breadcrumbs($base, $path) {
     return <li>{if ($i eq $last) then $part else <a href='{$base}/{$link}'>{$part}</a>}</li>
 };
 
+
+
 declare function lw:pagination($pagination-map) {
     let $current := $pagination-map('current')
-    let $total := $pagination-map('total')
-    (: There are two ways to handle params.
-        This approach - where I'm removing the param before adding it,
-        and the other which requires map:merge - and is not yet available. 
-        HOWEVER map:new() does the same thing:
-        map:new((map:entry('a',1), map:entry('b',2), map:entry('a',3)))?a eq 3
-    :)
-    let $p := map:remove($pagination-map?params,'p')
-    let $p-str := string-join(map:for-each-entry($p,function($k,$v){$k || '=' || $v}),'&amp;')
-    let $path-params := if ($p-str ne '') then  $p-str || '&amp;' else ""
     
+    let $disabled-fn := function ($n) { if ($current eq $n ) then attribute class {'disabled'} else () }
+    
+    let $total := $pagination-map('total')
+    
+    let $rpp := string($pagination-map?rpp)
+    (: I want to store this rpp setting for the user but there are some unresolved issues.
+        The BEST option would be to use LOCALSTORAGE ON THE CLIENT - and have a per-list setting.
+            - would need pekoe-workspace to retrieve the parameter from LocalStorage AND 
+            - pekoe-workspace would have to APPEND the parameter to each list view (based on the URL) - IFF not already SET.
+            - pekoe-common/list would need to SET the value for the current list WHEN the value is CHANGED.
+        The next option is to USE a COOKIE to store the value on the client 
+            - but this would become cumbersome and care must be taken 
+            - to avoid trashing the main cookie.
+            - Awkward to overwrite
+        Final possibility is to store the value per-list on the Server
+            - possibily easiest to implement
+            - no client-code javascript to mess with
+            - BUT will be PER-USER and not per MACHINE - which means that a user selecting a large number (on a Desktop display)
+              will see the same setting on their laptop. 
+              UNLESS I can record USER, List, SCREEN (which I already have access to).
+    :)
+    
+    let $p-map := map:remove($pagination-map?params,'p') (: Remove the current p= from the map - but leave other params like search, action and rpp :)
+    let $p-items := map:for-each-entry($p-map,function($k,$v){if ($k ne '') then $k || '=' || $v else ()})
+    
+    let $rpp-map := map:remove($p-map,'rpp') (: also remove rpp - but leave the other params as above (p is automatically set back to 1 when rpp changes) :)
+    let $rpp-items := map:for-each-entry($rpp-map,function($k,$v){if ($k ne '') then $k || '=' || $v else ()})
+    
+    let $p-fn := function ($n) { string-join(($p-items,'p=' || $n),'&amp;') }
+    let $rpp-fn := function () { (10, 20, 25, 50, 100, 500) ! <li><a href='?{string-join(($rpp-items,'rpp=' || .),'&amp;')}'>{.}&#160;{if (string(.) eq $rpp) then <span class='glyphicon glyphicon-ok'/> else ()}</a></li>   }
+                                   
     return
     if ($total eq 1) then 
-        <nav><ul class='pagination' style='margin-top:0'><li class='disabled'><a >({$pagination-map?items} items)</a></li></ul></nav>
+        <nav><ul class='pagination' style='margin-top:0'>
+            <li class='dropdown'>
+                <a class='dropdown-toggle' id='rppSelect' data-toggle='dropdown'>({$pagination-map?items} items) <span class='caret'></span></a>
+                <ul class="dropdown-menu" role="menu" aria-labelledby="rppSelect">
+                    <li class='dropdown-header'>Items per page</li>
+                    {   $rpp-fn()    }
+                </ul>
+            </li></ul></nav>
     else 
         <nav><ul class='pagination' style='margin-top:0'>
             {
             if ($total lt 5) then (
-                for $n in 1 to $total return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$path-params}p={$n}'>{$n}</a></li>
+                for $n in 1 to $total return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$p-fn($n)}'>{$n}</a></li>
             )
             else (
                 let $first := max((1,$current - 2)) 
                 (: first is also either $first or ($total - 4) whichever is least :)
                 let $first := min(($first, $total - 4))
                 let $last := min(($total, $first + 4))
-                return
-                
-                ((:Go First:)<li>{if ($current eq 1) then attribute class {'disabled'} else ()}<a href="?{$path-params}p=1" title='First'><i class='fa fa-angle-double-left'></i></a></li>,
-                (: Go Prev:)<li>{if ($current eq 1) then attribute class {'disabled'} else ()}<a title='Previous' href="?{$path-params}p={if ($current ne 1) then $current - 1 else ()}"><i class='fa fa-angle-left'></i></a></li>,
-                (for $n in $first to $last return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$path-params}p={$n}'>{$n}</a></li>),
-                (: Go Next:)<li>{if ($current eq $total) then attribute class {'disabled'} else ()}<a title='Next' href="?{$path-params}p={if ($current eq $total) then $current else $current + 1}"><i class='fa fa-angle-right'></i></a></li>,
-                (: Go Last:)<li>{if ($current eq $total) then attribute class {'disabled'} else ()}<a title='Last' href="?{$path-params}p={$total}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>
-                (: RPP:)
-(:                <li><a title='Records per page' href="?{$path-params}rpp={$total}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>:)
+                return (
+                (: Go First :)                    <li>{$disabled-fn(1)     }<a title='First'    href="?{$p-fn(1)     }"><i class='fa fa-angle-double-left'></i></a></li>,
+                (: Go Prev :)                     <li>{$disabled-fn(1)     }<a title='Previous' href="?{$p-fn(if ($current ne 1) then $current - 1 else ())}"><i class='fa fa-angle-left'></i></a></li>,
+                (for $n in $first to $last return <li>{if ($n eq $current) then attribute class {'active'} else () }<a href='?{$p-fn($n)}'>{$n}</a></li>),
+                (: Go Next :)                     <li>{$disabled-fn($total)}<a title='Next'     href="?{$p-fn(if ($current eq $total) then $current else $current + 1)}"><i class='fa fa-angle-right'></i></a></li>,
+                (: Go Last :)                     <li>{$disabled-fn($total)}<a title='Last'     href="?{$p-fn($total)}"><i class='fa fa-angle-double-right'></i> ({$total} pages)</a></li>
                 )
             )
             }
-            <li class='disabled'><a >({$pagination-map?items} items)</a></li>
+            <li class='dropdown'>
+                <a class='dropdown-toggle' id='rppSelect' data-toggle='dropdown'>({$pagination-map?items} items) <span class='caret'></span></a>
+                <ul class="dropdown-menu" role="menu" aria-labelledby="rppSelect">
+                    <li class='dropdown-header'>Items per page</li>
+                    {    $rpp-fn()   }
+                </ul>
+            </li>
         </ul></nav>
 };
 
@@ -469,25 +546,111 @@ declare function lw:get-ordered-items($content as map(*) ) {
     else $content?items
 };
 
-declare function lw:csv-page($original-content as map(*)) {
 
-(:    response:stream-binary((
-        array:for-each($content('column-headings'), lw:make-column-heading(?,$content))
-    for $row at $i in lw:get-ordered-items($content)[position() = $pm?start to $pm?end]
-    let $row-data := $row-fn($row) (\: Row-data are the calculations and common values needed to present each row in the table. :\)
+(:
+    Ideally, there will be a simple parameter switch to get here rather than the list-page.
+    $content?export
+    view is already used
+    ?download
+    ?export
+    
+    But for the moment, I'll have change it in the original query
+:)
+
+(:------------------------------------------------------------- THE EXPORT FUNCTION ---------------------------------------------:)
+declare function lw:export-csv($original-content as map(*)) {
+    let $content := lw:pagination-map($original-content)
+
+    let $fn := replace($content?title, "[\W]+","-") || "-" || format-dateTime(current-dateTime(), "[Y][m][d]-[h][m]") || ".txt"
+    let $row-fn := if (map:contains($content, "row-function")) then $content?row-function else function ($row) {map {}}
+    let $fields := $content?fields
+    let $t := ','
+    let $pm := $content?pagination-map
+    let $header1 := response:set-header('Content-disposition', concat('attachment; filename=',$fn))
+    let $header2 := response:set-header('Content-type','text/csv')
+    let $serialization-parameters :=
+        <serialization-parameters xmlns="http://www.w3.org/2010/xslt-xquery-serialization">
+          <method>text</method>
+          <item-separator>, </item-separator>
+        </serialization-parameters>    
+    
+    let $header := array:fold-left($content('column-headings'), (), function ($x,$y) {string-join(($x,'"',$y,'"'), $t)})
+
+
+    return (
+        $header, $cr,
+        for $row in lw:get-ordered-items($content)[position() = $pm?start to $pm?end]
+        let $row-data := $row-fn($row) 
+        return (
+                array:fold-left(
+                    $content('column-headings'), 
+                    (),
+                    function($x, $field) {
+                        string-join(
+                        ($x,
+                        if (map:contains($fields, $field)) then 
+                        try { replace(
+                                serialize(<n>{$fields($field)?value($row, $row-data)}</n>,$serialization-parameters)
+                            ,'\t|\n|&#160;',' ')
+                            
+                        
+                        }                     
+                        catch * { util:log('warn', '****************** EXPORT ERROR FOR ' || $field ||  " : "|| $err:description ) }
+                        else ''), $t)
+                        
+                        }
+                        ),$cr)
+                        )
+};
+
+declare function lw:export-page($original-content as map(*)) {
+    let $content := lw:pagination-map($original-content)
     let $cr := "&#13;"
     let $t := "&#9;"
-    return 
-(\: How did I do CSV? Can I use a simple string-join?  :\)
-            <tr>
-                
-                {array:for-each($content('column-headings'), function($field) {
-                    if (map:contains($fields, $field)) then 
-                         <td>{try { $fields($field)?value($row, $row-data)} catch * { util:log('warn', '****************** FIELD ERROR FOR ' || $field || ' of row ' || $i || " : "|| $err:description ) }}</td>
-                    else <td>&#160;</td>
-            })}</tr>:)
+    let $fn := replace($content?title, "[\W]+","-") || "-" || format-dateTime(current-dateTime(), "[Y][m][d]-[h][m]") || ".txt"
+    let $row-fn := if (map:contains($content, "row-function")) then $content?row-function else function ($row) {map {}}
+    let $fields := $content?fields
+    let $pm := $content?pagination-map
+    let $header1 := response:set-header('Content-disposition', concat('attachment; filename=',$fn))
+    let $header2 := response:set-header('Content-type','text/tab-separated-values')
+    let $serialization-parameters :=
+        <serialization-parameters xmlns="http://www.w3.org/2010/xslt-xquery-serialization">
+          <method>text</method>
+          <item-separator>, </item-separator>
+        </serialization-parameters>    
+    
+    let $header := array:fold-left($content('column-headings'), (), function ($x,$y) {string-join(($x,$y), $t)})
 
-()
+
+    return (
+        $header, $cr,
+        for $row in lw:get-ordered-items($content)[position() = $pm?start to $pm?end]
+        let $row-data := $row-fn($row) 
+        return (
+                array:fold-left(
+                    $content('column-headings'), 
+                    (),
+                    function($x, $field) {
+                        string-join(
+                        ($x,
+                        if (map:contains($fields, $field)) then 
+                        try { replace(
+                                serialize(<n>{$fields($field)?value($row, $row-data)}</n>,$serialization-parameters)
+                            ,'\t|\n|&#160;',' ')
+                            
+                        
+                        }                     
+                        catch * { util:log('warn', '****************** EXPORT ERROR FOR ' || $field ||  " : "|| $err:description ) }
+                        else ''), $t)
+                        
+                        }
+                        ),$cr)
+                        )
+};
+
+declare function lw:process($original-content as map(*)) {
+    if ($original-content?allow-export and (request:get-parameter-names() = 'download')) then lw:export-page($original-content)
+    else lw:list-page($original-content)
 };
 
 (:
@@ -502,6 +665,7 @@ $content:
 - fields - a map containing a map for each entry in column-headings. Each of these must have a 'value' function
 
 :)
+
 declare function lw:list-page($original-content as map(*)) {
 
 let $content := lw:pagination-map($original-content)
@@ -548,11 +712,12 @@ return
         <div class='pull-right' role='group' aria-label='Open actions'>
            
             <div class="dropdown btn-group"><!-- ##################### FILE MENU ################### -->
-              <button class="btn btn-default dropdown-toggle   p-needs-selection" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
+              <button class="btn btn-default dropdown-toggle   p-needs-selection" type="button" 
+              id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
                 File menu
                 <span class="caret"></span>
               </button>
-              <ul class="dropdown-menu  p-needs-selection" role="menu" aria-labelledby="dropdownMenu1">
+              <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu1">
               {
               ()
               (:
@@ -639,17 +804,18 @@ return
                 {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='rename' data-params='name'>Rename</a></li> else () }
                 <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='move-up' data-confirm='yes'>Move to parent folder</a></li>
                 {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='delete' data-confirm='yes'>Delete</a></li> else ()}
-                {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then 
-                    (<li role="presentation"><a id='openItem' class='menuitem  p-needs-selection' tabindex="-1" href="/exist/pekoe-app/manage-files.xql" >Open</a></li>,
-                    <li role="presentation"><a id='openItemTab' class='menuitem' tabindex="-1" href="/exist/pekoe-app/manage-files.xql" >Open in new tab</a></li>)
-                else () }
+                <li role="presentation"><a id='openItem' class='menuitem  p-needs-selection' tabindex="-1" href="#" >Open</a></li>
+                <li role="presentation"><a href='#' id='openItemTab' class='menuitem' tabindex="-1"  >Open in new tab</a></li>
+                
                 <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Unlock</a></li>
               </ul>
-            </div>
-
-            <button id='openItem' type='button' class='btn p-needs-selection btn-default'><i class='glyphicon glyphicon-folder-open'></i>Open</button>
-            <button id='openItemTab' type='button' class='btn p-needs-selection btn-default'><i class='glyphicon glyphicon-share-alt'></i>Open in new tab</button> 
-            <button id='refresh' type='button' class='btn btn-default'><i class='glyphicon glyphicon-refresh'></i>Refresh</button>  
+            </div>            
+            <button onclick='window.print();' id='printBtn' type='button' class='btn btn-default'><i class='glyphicon glyphicon-print'></i> Print</button>
+            {if ($content?allow-export eq true()) then 
+            <button onclick='location.href="{request:get-uri()}?{string-join(("download", request:get-query-string()),'&amp;')}"' id='exportBtn' type='button' class='btn btn-default'><i class='glyphicon glyphicon-download-alt'></i> Export</button>
+            else ()
+            }
+            <button id='refresh' type='button' class='btn btn-default'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>  
         </div>
         <div class='pull-left' style='margin-left:1em'>{lw:pagination($content?pagination-map)}</div>
     </div>

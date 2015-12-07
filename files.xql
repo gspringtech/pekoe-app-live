@@ -502,6 +502,6 @@ let $content :=  map:new(($default-content,  map {
                 
 })) (: end of map:new :)
 
-return lw:list-page($content)
+return lw:process($content)
 
 
