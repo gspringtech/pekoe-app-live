@@ -51,4 +51,15 @@ function local:login-error() {
     else local:login()
 };
 
+
+declare 
+%rest:GET
+%rest:POST("{$body}")
+%rest:path("/report")
+function local:csp-report($body) {
+    util:log-app('warn','login.pekoe.io', 'received report'),
+    util:log-app('warn','login.pekoe.io', $body),
+    util:log-app('warn','login.pekoe.io', '----------------------------')
+};
+
 ()

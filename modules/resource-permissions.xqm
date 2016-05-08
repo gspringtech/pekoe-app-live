@@ -10,6 +10,17 @@ declare variable $rp:collection-permissions := "rwxrwx---";
 declare variable $rp:template-permissions :=   "rw-rw----";
 declare variable $rp:merge-permissions :=      "rwxr-x---"; (: will be owned by admin :)
 
+
+(:   ------- 2016-01-12
+   What about the Editors/Viewers approach? 
+   Members of the eponymous owner-group are Editors, members of the file's group are Viewers. 
+   Then - an Edit check becomes simpler. Is the user a member of the owner-group?
+   SIMPLE - rp:resource-permissions($resource)?editor
+   -------
+   :)
+   
+
+
 (: ------------------------------------------------------------------------------  The RULES for JOB documents
     A user can READ a resource by being in the GROUP
     A user can EDIT a resource 
@@ -153,7 +164,7 @@ declare function rp:release-job($file) {
     if ($file eq "") then <result status='fail'>No file</result>
     else 
         let $done := rp:unlock-file($file)
-        return <result status="okay" />
+        return ()
 };
 
 (: User has the file open and now wants to close it. :)
@@ -162,7 +173,11 @@ declare function rp:unlock-file($path) {
     if (util:is-binary-doc($path)) then rp:template-permissions($path)
     else
         let $doc := doc($path)
-        return util:exclusive-lock($doc, rp:really-unlock-file($path))
+        let $uri := xs:anyURI($path)
+        let $res := rp:resource-permissions($path)
+        let $owner := $res?col-owner
+        let $group := $res?col-group
+        return util:exclusive-lock($doc, rp:really-unlock-file($uri, $owner, $group))
 };
 
 
@@ -170,23 +185,22 @@ declare function rp:lock-file($path) {
     if (util:is-binary-doc($path)) then rp:template-permissions($path)
     else
         let $doc := doc($path)
-        return util:exclusive-lock($doc, rp:really-lock-file($path))
+        let $uri := xs:anyURI($path)
+        let $res := rp:resource-permissions($path)
+        let $user := $res?username
+        return util:exclusive-lock($doc, rp:really-lock-file($uri, $user))
 };
 
-declare function rp:really-lock-file($path) {     (: NOTE: This MUST be performed within the lock above:)
-    let $uri := xs:anyURI($path)
-    let $res := rp:resource-permissions($path)
-    return  (
-        sm:chown($uri, $res?username), 
-(:      Back to this discussion again. The Collection-group determines who can VIEW the files in the collection.
-        So each file in the collection must be ...r----- for that group.
-        Sometimes files are created with the wrong group (not sure why - perhaps Admin's fault). 
-        So these files should be moved into the collection-group.
-        WHEN would a FILE (a Job file - not Binary or Collection) ever need to belong to a DIFFERENT GROUP?
-:)     
-        sm:chmod($uri,$rp:open-for-editing), 
-            <result>success</result>)
-
+declare function rp:really-lock-file($uri, $user) {     (: NOTE: This MUST be performed within the lock above:)
+    (:      Back to this discussion again. The Collection-group determines who can VIEW the files in the collection.
+            So each file in the collection must be ...r----- for that group.
+            Sometimes files are created with the wrong group (not sure why - perhaps Admin's fault). 
+            So these files should be moved into the collection-group.
+            WHEN would a FILE (a Job file - not Binary or Collection) ever need to belong to a DIFFERENT GROUP?
+    :)     
+    sm:chown($uri, $user), 
+    sm:chmod($uri,$rp:open-for-editing), 
+    <result>success</result>
 };
 
 (: There are TWO forms of this Unlock function. 
@@ -198,20 +212,11 @@ declare function rp:really-lock-file($path) {     (: NOTE: This MUST be performe
 
 :)
 
-declare function rp:really-unlock-file($path) {     (: NOTE: This MUST be performed within the lock above:)
-    let $uri := xs:anyURI($path)
-    let $res := rp:resource-permissions($path)
-    return 
-(:        if ($res('owner') eq $res('username')) (\: and $is-open-for-editing)  -- this caused problems with files that didn't close correctly initially.:\) 
-        then :)
-        (
-            sm:chown($uri, $res?col-owner), 
-            sm:chgrp($uri, $res?col-group),      
-            sm:chmod($uri,$rp:closed-and-available), 
-            util:log('info','*********** USER ' || $res('username') || ' UNLOCKED FILE ' || $path),
-            <result>success</result>
-        )
-(:        else <result>fail</result>:)
+declare function rp:really-unlock-file($uri, $owner, $group) {     (: NOTE: This MUST be performed within the lock above:)
+    sm:chown($uri, $owner), 
+    sm:chgrp($uri, $group),      
+    sm:chmod($uri, $rp:closed-and-available), 
+    <result>success</result>
 };
 
 (:
@@ -237,6 +242,7 @@ declare function rp:really-unlock-file($path) {     (: NOTE: This MUST be perfor
 :)
 
 declare function rp:template-permissions($path) {
+(:    let $log := util:log('warn', '((((((((((((((( PROCESS PATH ' || $path || ')))))))))))))))))'):)
     let $res := rp:resource-permissions($path)  
     let $uri := xs:anyURI($path)
     let $appropriate-permissions := if (util:is-binary-doc($path)) then $rp:template-permissions else $rp:closed-and-available

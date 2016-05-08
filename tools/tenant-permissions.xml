@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<permissions>
+    <description>As this is intended to be a Tenant-permissions record, 
+        it should start at /db/pekoe/tenants/*
+        
+        It might be best to generate this from an existing tenant. Like BKFA.
+        Then apply it to another like TDBG.
+        
+        Examples of specific permissions:
+        /db/pekoe/tenants/tdbg/config/new-job.xql
+    </description>
+    <collection path="files" mode="" owner="" group="">
+        <description>Description of this collection's permissions</description>
+        <p path="" mode="" owner="" group="">description of this resource</p>
+        <p path="/db/pekoe/tenants/bkfa/config/new-job.xql" mode="r-sr-x---" owner="TENANT_staff" group="TENANT_staff">
+            Note that the permissions here are r-xr-x--- with SetUID on owner
+        </p>
+        <p path="/db/pekoe/tenants/tdbg/config/serial-numbers/documentation.xml" mode="rw-r--r--" owner="TENANT_staff" group="TENANT_staff"/>
+    </collection>
+</permissions>

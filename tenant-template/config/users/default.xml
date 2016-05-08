@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config for="default">
-    <pref for="bookmarks"> 
-        {"groups":[{"title":"Favourites...","items":[{"href":"/exist/restxq/pekoe/welcome","active":true,"type":"html","title":"Welcome"},{"href":"/exist/pekoe-app/files.xql?collection=/files","type":"html","title":"Files","active":true}],"open":true}]}
+    <!-- hoping to get /db/pekoe/tenants/<current-tenant>/files in the Files bookmark below... -->
+    <pref for="bookmarks">
+        <group>
+            <title>Favourites</title>
+            <item>
+                <title>Welcome</title>
+                <href>/exist/restxq/pekoe/welcome</href>
+                <type>report</type>
+            </item>
+            <item>
+                <title>Files</title>
+                <href>/exist/pekoe-app/files.xql</href>
+                <type>folder</type>
+            </item>
+        </group>
     </pref>
 </config>

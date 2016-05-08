@@ -29,10 +29,12 @@ xquery version "3.1";
 module namespace lw = "http://pekoe.io/list/wrapper";
 import module namespace resource-permissions = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
 import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/apps/pekoe/modules/tenant.xqm";
+import module namespace lt = "http://pekoe.io/list-tools" at "modules/list-tools.xqm"; (: can be used in queries and reports :)
 
 declare variable $lw:screen := request:get-cookie-value('screenx') || 'x' || request:get-cookie-value('screeny'); 
 declare variable $lw:action := request:get-parameter("action","List"); (: Must have useful default for when activated by browse-list:)
 declare variable $lw:method := request:get-method();
+declare variable $lw:server := "https://" || request:get-server-name();
 
 declare variable $lw:DEFAULT-LIST-SIZE := 20;
 
@@ -52,8 +54,9 @@ declare variable $lw:quarantined-path := substring-after($lw:path-to-me, $tenant
 (:declare variable $lw:collection-path := $tenant:tenant-path || "/files"; :)
 declare variable $lw:base-collection-path := '/files';
 
+(: -------------------------------  EVERY LIST SHOULD USE THIS to create the base content-map. --------------------- :)
 declare function lw:configure-content-map($config-map) {
-    (: Must provide defaults for these.   :)
+    (: Must provide defaults for these. These are not included in the final content map - they are for configuring it.   :)
     let $base-map := map {
         'show-footer' : false(),
         'allow-export' : false(),                                       (: Default prevents the button from appearing and also prevents user from trying ?download :)
@@ -67,6 +70,14 @@ declare function lw:configure-content-map($config-map) {
     :)
     return 
         map {
+        (: For each restricted menu item or other action, add a key. These can be overriden by the query.       :)
+        'hidden-menus' : map {
+            'rename': true(), 
+            'move-up' : not(sm:is-dba(sm:id()//sm:real/sm:username/string())) , 
+            'delete' : false(), (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())) ,:) 
+            'unlock':  false() (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())):)
+            
+        },
         'breadcrumbs' : lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=',$lw:quarantined-path),
         'path' : request:get-parameter("collection", $lw:base-collection-path),  (: default is /files. Override this. :)
         'path-to-me' : '/exist/pekoe-files/' || $lw:quarantined-path, (: overridden by /exist/pekoe-app/files.xql ONLY :)
@@ -79,7 +90,7 @@ declare function lw:configure-content-map($config-map) {
             let $path := '/exist/pekoe-files' || $quarantined-path
             let $display-title := $custom-conf?display-title($item)           
             let $permissions := lw:doc-permissions($colName || '/' || $child)
-            let $doctype := $custom-conf?doctype(())                            (:????:)
+            let $doctype := $custom-conf?doctype($item)
             return
             ( 
             if ($permissions?available) 
@@ -100,6 +111,7 @@ declare function lw:configure-content-map($config-map) {
                 }
         },
         'custom-row-parts' : ['list-all', 'new-xxx','text-search', 'xquery-search'],
+        'extra-content-url' : '/exist/pekoe-app/Associated-files.xql',
         'search' :  request:get-parameter('search',''),
         'xpath' : request:get-parameter("xpath",""),
         'custom-row' : map { (: map of functions producing each item in the control row above the table :)
@@ -262,7 +274,7 @@ declare function lw:xpath-search() {
     
     let $search := request:get-parameter("xpath",())
     let $cu-name := sm:id()//sm:real/sm:username/string() (:$lw:current-user/sm:username/string():)
-    let $check := if (matches($search,'util:eval|update')) 
+    let $check := if (matches($search,'util:eval|update|system|xmldb')) 
         then (util:log-app('warn','login.pekoe.io','%%%%%%%%%%%% USER ' || $cu-name || ' ATTEMPTED UNSAFE SEARCH: ' || $search),
             error((),'User ' || $cu-name || ' attempted unsafe search. This has been reported.')) 
         else ()
@@ -273,7 +285,7 @@ declare function lw:xpath-search() {
     let $map := lw:parse-xpath($search)
     
     let $xpathsearch := concat("collection('",$colpath,"')", $map?xpath )
-(:    let $debug := util:log('info','XPATH SEARCH ' || $xpathsearch):)
+    let $debug := util:log('info','XPATH SEARCH ' || $xpathsearch)
     let $results  := util:eval($xpathsearch) (: get all the result nodes :)
     return $results    
 };
@@ -532,7 +544,7 @@ declare function lw:paginate($items) {
 };
 
 declare function lw:get-ordered-items($content as map(*) ) {
-    if (map:contains($content, "order-by")) then (
+    if (map:contains($content, "order-by") and $content?order-by ne '') then (
     
         let $sort-key := substring-after($content?order-by, '-')
         let $direction := substring-before($content?order-by, '-')
@@ -650,8 +662,13 @@ declare function lw:export-page($original-content as map(*)) {
                         )
 };
 
+declare function lw:associated-content($content) {
+<html><head><title>Associated</title></head><body>Got here</body></html>
+};
+
 declare function lw:process($original-content as map(*)) {
     if ($original-content?allow-export and (request:get-parameter-names() = 'download')) then lw:export-page($original-content)
+    else if (request:get-parameter-names() = 'associated-content') then lw:associated-content($original-content)
     else lw:list-page($original-content)
 };
 
@@ -671,6 +688,10 @@ $content:
 declare function lw:list-page($original-content as map(*)) {
 
 let $content := lw:pagination-map($original-content)
+let $hide-menu := $original-content('hidden-menus')
+    
+(:let $log :=  if (map:contains($original-content,'hidden-menus')) then () else util:log('warn','M%%%%%%%%%%%%%%%%% NO MESUS'):)
+
 
 
 return
@@ -724,12 +745,12 @@ return
               ()
               (:
               TODO  - make File Edit and View menus
-                    - provide means of opening item in new Tab
+                    - provide means of opening item in new Tab. DONE
                     - provide better distinction between 'menuitem' and 'actionitem'
                     
                 Current items are: 
                     
-                View menu - opens new tab     
+                View menu - opens new tab     BUT THESE ARE BOOKMARKS in the Pekoe section.
                 
                     Bookmarks - list -                          View
                     Reports - list                              View
@@ -780,6 +801,7 @@ return
                 
              
               
+          what's wrong with this?????? This would be neater and easier to test 
                 let $actionItem := function ($admin-only as xs:boolean, $href, $path, $type, $title, $text) {
                     if ($admin-only and lw:user-is-admin()) then
                     <li role="presentation"><a class='actionitem' role="menuitem" tabindex="-1" href="{$href}" path="{$path}" data-type='{$type}' data-title='{$title}'>{$text}</a></li>
@@ -797,19 +819,80 @@ return
                     $actionItem(false(),   '/exist/pekoe-app/Issues.xql',    '/exist/pekoe-app/Issues.xql',    'other', 'Show Issues list',    'Issues'),
                     $menuItem(  false(),    '/exist/pekoe-app/manage-files.xql', '/exist/pekoe-app/manage-files.xql')
                     )
-:)
-              }
+                    
+                    Menu Items:
+                    - Show data
+                    - Rename
+                    - Move to parent folder
+                    - Delete
+                    - Open
+                    - Open in new Tab
+                    - Unlock
+                    
+                    Plus buttons
+                    - Print
+                    - Export
+                    
+                    (A) default "hide"? 
+                    (B) default "show"?
+                    
+                    Choose default show - on the basis that I'm creating menu items for users and so why wouldn't I want them to see it?
+                    But default show will be an empty map key
+                    if ($params?unlock) then 'only if true' else 'either false or missing' - so this is a "hide" option
+                    if ($hide?unlock) then 
+                    
+                    AHH - but that means that EVERY menu that needs to be hidden must be explicitly hidden. Okay - I can do that above.
+                    that means that an default hidden menu must be overridden in a query. That sounds okay.
+                    
+                    if ($hide-menu?delete eq true()) then 'hide it' else 'show it' - it will be shown unless explicitly hidden.
+                    What are the use-cases?
+                    Delete might be an admin function - I should be able to set it here. Show delete if admin otherwise hide.
+                    
+                    Delete is a good example. I only want to show it to Editors in Tabular-data. So by default it should be hidden - that means a config item
+                    It should also be shown to Admin (me). So the default is $hide-menu-item {'delete' : not((sm:is-dba(sm:id()//sm:real/sm:username/string()))) } 
+                    and 
+                    if ($hide-menu-item?delete) then () else <li>...</li>
+                    if ($hide-menu-item?open) then () else 'missing means false which means 'show''.
+                    
+                    $disabled?unlock = true() and missing from the list means NOT DISABLED. It's a little awkward but it works.
+                    If there's no config, then show the item if ($disabled?unlock) then () else 'show the menu'
+                    If there's a setting, $conf?disabled{'unlock', true()} then if ($disabled?unlock) then () else 'show the menu'
+                    If there's a setting and an override, then i$conf?disabled{'unlock', false()} - then 'show the menu'
+                    OTHERWISE EVERY menu item will need a config setting. (Not so bad, really - except I'll want to set it here and not above.)
+                    
+                    let $menu-item-fn := function($params-map) {
+                        <li role="presentation"><a class='menuitem' role='menuitem' tabindex='-1' href="$params-map?href" data-action='$params-map?action' data-type='{$params-map?type}' data-title='{$params-map?title}'>{$params-map?text}</a></li>
+                        <li role="presentation"><a class='menuitem'                 tabindex="-1" href='#'                id='openItemTab'   >Open in new tab</a></li>
+                    }
+                    
+                    *** This whole List thing should be Ajax driven and "live" rather than old-style http. ***
+                    
+
+              
               
                 <!--li role="presentation"><a class='menuitem' role='menuitem' tabidndex='-' href='/exist/pekoe-app/manage-files.xql'>New</a></li-->
-                <!-- ADD OPEN JOB FOLDER -->
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='data' data-type='other' data-title='Raw XML'>Show data</a></li>
-                {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='rename' data-params='name'>Rename</a></li> else () }
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='move-up' data-confirm='yes'>Move to parent folder</a></li>
-                {if (sm:is-dba(sm:id()//sm:real/sm:username/string())) then <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='delete' data-confirm='yes'>Delete</a></li> else ()}
-                <li role="presentation"><a id='openItem' class='menuitem  p-needs-selection' tabindex="-1" href="#" >Open</a></li>
-                <li role="presentation"><a href='#' id='openItemTab' class='menuitem' tabindex="-1"  >Open in new tab</a></li>
-                
-                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Unlock</a></li>
+                <!-- ADD OPEN JOB FOLDER
+                    Modify ACCESS to commands based on a CONFIG item. This will allow me to enable some functions for specific Lists (e.g. Tabular-data or Files.)
+                    
+                   Use config to hide for non-dba
+                   rename, move-up, delete, unlock 
+            -->    
+            :)
+              }
+              
+            {if ($hide-menu('show-data')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='data' data-type='other' data-title='Raw XML'>Show data</a></li>}
+            {if ($hide-menu('rename')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='rename' data-params='name'>Rename</a></li> }
+            {if ($hide-menu('move-up')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='move-up' data-confirm='yes'>Move to parent folder</a></li>}
+            {if ($hide-menu('delete')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='delete' data-confirm='yes'>Delete</a></li>}
+                 
+                <li role="presentation"><a class='menuitem  p-needs-selection' tabindex="-1" href='#' id='openItem'>Open</a></li>
+                <li role="presentation"><a class='menuitem' tabindex="-1"                 href='#' id='openItemTab'   >Open in new tab</a></li>                
+            {if ($hide-menu('unlock')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Unlock</a></li>}
               </ul>
             </div>            
             <button onclick='window.print();' id='printBtn' type='button' class='btn btn-default'><i class='glyphicon glyphicon-print'></i> Print</button>
@@ -929,6 +1012,7 @@ return
         ...
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn" id="modalDeleteBtn">Delete</button>
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary">Save changes</button>
       </div>
@@ -936,7 +1020,17 @@ return
   </div>
 </div>
 {if (map:contains($content, 'custom-script') and $content?custom-script instance of function(*)) then $content?custom-script($content) else ()}
-{if (map:contains($content, 'extra-content-url')) then <script>
+
+{
+(:  I want to generalise this but can't quite see what it would do other than display associated files.
+    Also, this code should not be here. It is not fully abstracted.
+    I'm saying "if there's an extra-content-url, look for a data('href') but that may not be the desired behaviour.
+    However, this behaviour IS common to all bundled Jobs - so I'll want to include it in the List Module.
+    
+    The other issue is more specific. Here, I'm generating the content-url with XQuery AND Javascript.     
+:)
+
+if (map:contains($content, 'extra-content-url')) then <script>
     $(function (){{
         if ( gs.scope) {{
             if (gs.scope.tab.extra === '') {{

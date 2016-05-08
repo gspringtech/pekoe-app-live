@@ -1,6 +1,14 @@
 xquery version "3.1";
-(: Files list. 
+(: Template Files list. 
+
+    Features:
+        - Integrated view of Templates and Templates Meta (somehow)
+        - Custom permission management (??)
+        - A Special Button which takes care of extracting the data files and generating the meta (INSTEAD of a TRIGGER)
+
     Don't use this as an example 'list'. Better to visit one of the Client lists like AD-Bookings or Distribution
+    This query is specific to the tenants/templates collection
+
 :)
 
 (: TODO - fix the XQuery so that the Breadcrumbs work and the full path is not included in the result. 
@@ -12,27 +20,16 @@ import module namespace lw="http://pekoe.io/list/wrapper" at "/db/apps/pekoe/lis
 import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/apps/pekoe/modules/tenant.xqm";
 import module namespace pqt="http://gspring.com.au/pekoe/querytools" at "xmldb:exist:///db/apps/pekoe/modules/querytools.xqm";
 
-(: TODO
-    Now that I've made this work, I need to add the significant new feature: the _pekoe.xml configuration file.
-    This file (which should have a schema) will tell me things like
-    'monthly-bookings.xql' is a report
-    
-    Add "kind" and make it sortable.
-    How do I achieve a secondary sort? (Sort by kind and File name)
-:)
-
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare option output:method "html5";
 declare option output:media-type "text/html";
 
-declare variable $local:current-collection := request:get-parameter('collection','/files');     (:  This should be used when constructing paths for the children.:)
+(: TODO - Prevent user from changing this to somewhere outside of /templates :)
+declare variable $local:current-collection := request:get-parameter('collection','/templates');     (:  This should be used when constructing paths for the children. So they don't step on the flowers. :)
 declare variable $local:collection-path := $tenant:tenant-path || $local:current-collection;    (:  This should be used when querying the db.:)
 declare variable $local:schemas := (collection("/db/pekoe/common/schemas")/schema,collection($tenant:tenant-path)/schema);
 
-(: NOTE: To process this by type (collection, query, Job), create a sequence of map {name: , type: }  - 
-    BUT these ITEMS will be processed by the LIST.xqm. Can it handle a sequence of Maps?
-    Will need to do this because currently the processing is based on extension. When the extension is missing, it's assumed to be a Collection which may be WRONG.
-:)
+(: NOTE: To process this by type (collection, query, Job), create a sequence of map {name: , type: }    :)
 declare variable $local:all-items := (    
     for $f in xmldb:get-child-resources($local:collection-path)[not(ends-with(.,'.xqm'))] order by $f return $f,
     for $f in xmldb:get-child-collections($local:collection-path) order by $f return $f
@@ -73,9 +70,7 @@ declare variable $local:workspace-type := map {
 
 declare variable $local:editor-link-protocol := map {'odt' : 'neo', 'ods' : 'neo'};
 
-(: This function simply checks user-access to the items in the current collection - to avoid permissions errors. :)
 declare function local:filtered-items() {
-    (: all-items is only used here - so can ditch it above. Need to make it a map so as to capture Collection or Resource:)
     for $c in ($local:all-items)
     return
         if (not(sm:has-access(xs:anyURI($local:collection-path || '/' || $c),'r'))) then ()
@@ -132,17 +127,8 @@ declare function local:format-collection($common, $item) {
         'data-type' : 'folder',
         'data-title' : $item,
         'data-path' : $safe-path,
-        'data-href' : '/exist/pekoe-app/files.xql?collection=' || $safe-path
-(:        'data-href' : '/exist/pekoe-app/files.xql?collection=' || $safe-path:)
+        'data-href' : '/exist/pekoe-app/Template-files.xql?collection=' || $safe-path
         }
-        (:(
-        attribute title {$safe-path || ' folder'},
-        attribute class {'collection'},
-        attribute data-type {'folder'},
-        attribute data-title {$item}, (\: Used as the Tab title :\)
-        attribute data-path {$safe-path},   (\: the resource path - for move/delete/rename :\)
-        attribute data-href {'/exist/pekoe-app/files.xql?collection=' || $safe-path}
-    ):)
     return map { 
     'path' : $path, 
     'attributes' : $attributes,
@@ -160,8 +146,6 @@ declare function local:format-xml($common, $item) {
 (:  NOT every XML file is a Job or Editable content. Some must be treated differently - but HOW?
     First option is to switch here .
     
-    One way to handle non-job items is to use a custom List. See Read-mail.
-    
     It should be easy enough to see if there's a SCHEMA/@for 
 :)
     let $path := $local:collection-path || '/' || $item
@@ -169,37 +153,8 @@ declare function local:format-xml($common, $item) {
     return 
         if ($doc/*/@tabular-data) then local:tabular-data-file($common, $item, $path, $doc) 
         else if ($local:schemas[@for eq name($doc/*)]) then local:format-job-file($common, $item, $path, $doc)
-        else if ($doc/name(*) eq 'mail:message') then local:mail-message-file($common, $item, $path, $doc)
         else local:other-xml-file($common,$item, $path, $doc)
-};
-
-(: I really don't like this - need a pluggable mechanism :)
-declare function local:mail-message-file($common, $item, $path, $doc) {
-    let $smp := sm:get-permissions(xs:anyURI($path))/sm:permission  (: <sm:permission owner="tdbg_staff" group="tdbg_staff" mode="r-xr-x---">    :)
-    let $safe-path := $local:current-collection || '/' || $item
-    let $short-name := substring-before($item,'.')
-    let $attributes := map { 
-        'title' : $safe-path || ' list',
-        'class' : 'other',
-        'data-type' : 'report',
-        'data-title' : $short-name,
-        'data-path' : $safe-path,
-        'data-href' : '/exist/pekoe-app/Read-mail.xql?action=view&amp;message=' || $path
-        }
-             
-    return map {
-        'path' : $path, 
-        'quarantined-path' : $safe-path,
-        'name' : $short-name,           
-        'attributes' :   $attributes,
-        'icon' : $local:type-icon('xql'),
-        'permissions' : $smp/@mode/string(),
-        'owner'   : $smp/@owner/string(),
-        'group' : $smp/@group/string(),
-        'created' : format-dateTime(xmldb:created($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
-        'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
-        }
-
+    
 };
 
 (: Handle non-editable XML data :)
@@ -327,14 +282,19 @@ var t = {
 declare function local:format-binary($common, $item) {    
     let $path := $local:collection-path || '/' || $item
     let $safe-path := $local:current-collection || '/' || $item
-    let $short-name := tokenize($item, '\.')[1] 
-(:    substring-before($item,'.'):)
+    let $short-name := substring-before($item,'.')
     let $smp := sm:get-permissions(xs:anyURI($path))/sm:permission
     let $extension := substring-after($item, '.')
+    
+    
     (:  +++ How do I change this so that ODT and ODS (initially) cause a File-handler to run? +++++   :)
-    let $edit-link := if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) 
-        then "/exist/pekoe-app/Letter-opener.xql?file=" || $local:editor-link-protocol($extension) || ":https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path 
+    let $edit-link := 
+(:    if (false()):)
+            if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) 
+        (:  THIS IS REALLY WRONG!!! THIS WILL ALWAYS OPEN THE ReAL File          :)
+        then "/exist/pekoe-app/Letter-opener.xql?file=" || $local:editor-link-protocol($extension) || ":" || $lw:server || "/exist/webdav" || $path 
         else '/exist/pekoe-files' || $safe-path
+        
     let $attributes := map { 
         'title' : $safe-path,
         'class' : $extension,
@@ -348,7 +308,7 @@ declare function local:format-binary($common, $item) {
     'path' : $path, 
     'attributes' : $attributes,
     'quarantined-path' : tenant:quarantined-path($path),
-    'name' : $short-name,
+    'name' : substring-before($item,'.'),
     'type' : $extension,
     'permissions' : $smp/@mode/string(),
     'owner'   : $smp/@owner/string(),
@@ -357,9 +317,9 @@ declare function local:format-binary($common, $item) {
     'created' : format-dateTime(xmldb:created($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
     'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
     'admin-link' :  if ($extension eq 'docx') 
-                    then <a>{attribute href { "ms-word:ofe|u|https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path }}{$item}</a> 
+                    then <a>{attribute href { "ms-word:ofe|u|" || $lw:server || "/exist/webdav" || $path }}{$item}</a> 
 (:                    else (<a>{attribute href { "/exist/pekoe-app/Letter-opener.xql?file=neo:https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path }}{$item}</a> ):)
-                    else (<a>{attribute href { "https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path }}{$item}</a> )
+                    else (<a>{attribute href { $lw:server || "/exist/webdav" || $path }}{$item}</a> )
     }
 };
 
@@ -438,7 +398,15 @@ declare function local:value-or-input($field, $action, $path) {
 };
 
 (:  ----------------------------------------------------   MAIN QUERY ---------------------------------------- :)
-
+(:let $server-log := util:log('info','SERVER: request:get-effective-uri() ' || request:get-effective-uri())
+let $sl2 := util:log('info','SERVER: request:get-context-path() ' || request:get-context-path())
+let $sl3 := util:log('info','SERVER: request:get-hostname() ' || request:get-hostname())
+let $sl3 := util:log('info','SERVER: request:get-scheme() ' || request:get-scheme()):)
+(: These are good... :)
+let $sl3 := util:log('info','SERVER: request:get-server-name() ' || request:get-server-name()) (: cm.pekoe.io :)
+let $sl3 := util:log('info','SERVER: request:get-uri() ' || request:get-uri()) (: /exist/pekoe-app/Template-files.xql  xxx NOT /exist/rest/db/apps/pekoe/Template-files.xql xxx :)
+let $sl3 := util:log('info','SERVER: request:get-url() ' || request:get-url()) (: http://cm.pekoe.io/exist/pekoe-app/Template-files.xql :)
+let $sl4 := util:log('info','SERVER HEADERS ' || string-join(request:get-header-names(),' '))
 let $conf := map {
     'doctype' : function ($item) { 'unknown' },
     'display-title' : function ($item) { $item }
@@ -448,12 +416,12 @@ let $default-content := lw:configure-content-map($conf)
 
 let $content :=  map:new(($default-content,  map {
     'title' : 'Files',
-    'path-to-me' : '/exist/pekoe-app/files.xql',
+    'path-to-me' : '/exist/pekoe-app/Template-files.xql',
     'breadcrumbs' : if ($lw:action eq 'Search') 
-                    then lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $local:current-collection || '/search')
+                    then lw:breadcrumbs('/exist/pekoe-app/Template-files.xql?collection=', $local:current-collection || '/search')
                     else if ($lw:action eq 'xpath') 
-                    then lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=', $local:current-collection || '/XQuery')
-                    else lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=',$local:current-collection),
+                    then lw:breadcrumbs('/exist/pekoe-app/Template-files.xql?collection=', $local:current-collection || '/XQuery')
+                    else lw:breadcrumbs('/exist/pekoe-app/Template-files.xql?collection=',$local:current-collection),
     'column-headings': 
         switch ($local:view)
         case 'supplies' return ['AD-Date','Org','Kits', 'Paid?', 'Invoice-number', 'Latest Note']
@@ -465,15 +433,13 @@ let $content :=  map:new(($default-content,  map {
         let $common := local:common-features($item)
         return 
         switch (substring-after($item,'.'))
-        (:  WRONG - this doesn't handle files with NO EXTENSION.      ************************************************* :)
-(:        case '' return if (xmldb:collection-available(util:collection-name($item))) then local:format-collection($common, $item) else local:format-binary($common, $item):)
-        case '' return  local:format-collection($common, $item) 
+        case '' return local:format-collection($common, $item)
         case 'xml' return local:format-xml($common, $item)
         case 'xql' return local:format-query($common, $item)
         default return local:format-binary($common, $item)        
     },
     'row-attributes' : function ($item, $row-data) {
-        (: Attributes is now a map. This returns a sequence of html attributes to be added to the TR. In this case, the functions above are producing a map of attributes.  :)
+        (: Attributes is now a map        :)
         map:for-each-entry($row-data?attributes, function ($k, $v) {
             attribute {$k} {$v}
         })
@@ -540,15 +506,10 @@ let $content :=  map:new(($default-content,  map {
     $up.attr('disabled','disabled');
     $('#fname1').on('change', function () {
         if ($(this).val() !== '') {
-            var reCheck = /.+\.(pdf|odt|ods|docx|txt|zip)$/;
+            var reCheck;
             // only allow .docx .txt, .odt .pdf 
             // check the name for bad chars
-            if ($(this).val().search(reCheck) !== -1) {
-                $up.removeAttr('disabled');
-            } else {
-                alert('File must be a docx, .odt, .ods, .pdf or .txt')
-                $up.attr('disabled','disabled');
-            }
+            $up.removeAttr('disabled');
         } else {
             $up.attr('disabled','disabled');
         }

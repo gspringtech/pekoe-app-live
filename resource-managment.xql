@@ -1,8 +1,10 @@
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 (:
     Top-level query manages access to files. 
     Manage Capture and Release
     Access only via controller (how can I prevent other access?)
 :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 xquery version "3.0"; 
 
 
@@ -24,13 +26,20 @@ declare variable $local:tenant-files := "/db/pekoe/" || request:get-parameter("t
    
    What is the advantage of this over just having rw-r-----?
    
-   The main advantage is that I don't have to remember who owned the file before it is opened.
+   The main advantage is that I don't have to remember who owned the file before it is opened. 
+   2016-01-12. Hmmmm. Doesn't sound so good now.
    
    The advantage of using the collection-owner and -group is that the -owner should be a group-user and will determine 
    who can edit the file, while the -group determines who can read the file.
    
    The collection will by inherit its parent-collection owner and group, but it can be modified as needed.
    However, files within a collection are either "open" or "closed".
+   
+   ------- 2016-01-12
+   What about the Editors/Viewers approach? 
+   Members of the eponymous owner-group are Editors, members of the file's group are Viewers. 
+   Then - an Edit check becomes simpler. Is the user a member of the owner-group?
+   -------
    
    :)
 
@@ -108,11 +117,12 @@ declare function local:confirm-my-lock($res) { (: Am I now the owner of the file
 (: NOTE: This MUST be performed within an exclusive-lock.  :)
 declare function local:really-lock-file($href, $res) {
     let $uri := xs:anyURI($href)
-    let $locked := xmldb:document-has-lock($res('collection'), $res('docname')) (: HUH? Didn't I just lock it? :)
-    let $is-closed-and-available := $res('mode') eq $rp:closed-and-available
+    let $locked := xmldb:document-has-lock($res('collection'), $res('docname')) (: Checking to see if someone else has just locked it. :)
+    let $is-closed-and-available := $res('mode') eq $rp:closed-and-available 
     return if (not($locked) and $is-closed-and-available)
     then local:set-open-for-editing($uri)
     else 
+        (: Usually this is because the user already has the file open.   :)
         util:log("warn", "NOT ABLE TO CAPTURE FILE. SYSTEM-LOCKED? " 
         || (if ($locked) then 'YES' else 'NO') 
         || ', AVAILABLE? ' 
@@ -124,10 +134,10 @@ declare function local:really-lock-file($href, $res) {
 
 
 (: this should be okay - only the owner can modify :)
-
+(: THIS IS A TERRIBLE FUNCTION NAME. :)
 declare function local:set-open-for-editing($uri) {
     let $res := rp:resource-permissions($local:path)
-    let $log := util:log('info','SET OPEN FOR EDITING FOR ' || $res?username)
+    let $log := util:log('info','          +++++++++++ USER '  || $res?username || ' CAPTURED ' || $uri)
     return    (
     sm:chown($uri,$res?username), 
     (: DON'T CHANGE THE GROUP. The Group determines who can READ the file, which can be different to who can EDIT. :)
@@ -159,7 +169,8 @@ declare function local:store($data, $fullpath) {
              <result status="okay" >{$result}</result>
              else <result status='fail' />
     }; 
-
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 
 (: -----------------------------------  MAIN TRANSACTION QUERY --------------------- :)
 if ($local:method eq "GET") then 

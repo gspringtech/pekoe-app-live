@@ -20,6 +20,12 @@ declare function local:find-my-files() {
       It was suggested that I use collection and document traversal rather than this...
       See http://exist-db.org/exist/apps/wiki/blogs/eXist/HoF
       
+      Another approach to this would be to LOG all the files this user opens,
+      and delete from the log when they close the file.
+      The remainder would be the files that need closing.
+      
+      THIS APPROACH (below) only closes XML files in tenant/files/...
+      
 :)
     for $doc in collection($local:tenant-path || "/files")/*[sm:get-permissions(xs:anyURI(document-uri(root(.))))/sm:permission/@owner eq $local:current-user]
     let $path := document-uri(root($doc))

@@ -52,7 +52,7 @@ case "template"
 default return <result>Unknown action {$local:action}</result>:)
 
 (:ALL THAT THIS QUERY DOES IS WRAP A SETUID AROUND THE ORIGINAL GET-LINKS-QUERY:)
-    let $log := util:log('info','%%%%%%%%%%%% CHECK TEMPLATE ' || request:get-parameter('template',""))
+(:    let $log := util:log('info','%%%%%%%%%%%% CHECK TEMPLATE ' || request:get-parameter('template',"")):)
     let $path := merge:update-links-query(request:get-parameter('template',""), request:get-parameter('tenant',''))
 (:    let $attr := request:set-attribute('xquery.url',$path):)
     return $path

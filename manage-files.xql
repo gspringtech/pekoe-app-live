@@ -1,4 +1,6 @@
 xquery version "3.0";
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 (: 
     THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN.
     
@@ -135,6 +137,7 @@ declare function local:good-file-name($n,$type) {
     Why do I have setUid enabled on this file?
     
     :)
+    
 declare function local:do-delete() {
     let $path := request:get-parameter("path","")
     return if ($path eq $local:base-collection) then (response:set-status-code(304),response:set-header("Location", request:get-url()))
@@ -161,12 +164,20 @@ declare function local:is-bundle($path) as xs:boolean {
 };
 
 declare function local:trash-file-or-collection($path) as xs:string {
+    let $real-path := $local:tenant-path || $path
+    let $parent-collection := util:collection-name($real-path)
     let $delete-log:= if (xmldb:collection-available($real-path)) 
                     then util:log("warn", "GOING TO DELETE COLLECTION (real-path)" || $real-path || " (path)" || $path )
                     else util:log("warn", "GOING TO DELETE " || util:document-name($real-path) || " FROM COLLECTION " || $parent-collection )
                     
-    let $z := compression:zip(xs:anyURI($r),true())
-    let $stored := xmldb:store('/db/pekoe/tenants/cm/temp','test3.zip',$z)
+    let $z := compression:zip(xs:anyURI($real-path),true())
+    let $trash-path := $local:tenant-path || '/trash'
+    let $name := local:good-trash-name($path)
+    let $stored := xmldb:store($trash-path,$name,$z)
+    (: REALLY DELETE IT :)
+    let $delete := if (xmldb:collection-available($real-path)) 
+        then xmldb:remove($real-path) 
+        else xmldb:remove($parent-collection, util:document-name($real-path))
     return 'Deleted file ' || $path
 
 };  
@@ -186,6 +197,7 @@ declare function local:trash-bundle($path) as xs:string {
     let $r := util:collection-name($path)
     let $local-p := substring-after($r,$local:tenant-path || '/')
     let $name := local:good-trash-name($local-p)
+    (: This zip file will contain the full folder-path from /db to the file.   :)
     let $z := compression:zip(xs:anyURI($r),true()) (: Use Hierarchy is true so that path-to-collection AND path-within-bundle are captured. :)
     
     let $stored := xmldb:store($local:tenant-path, $name,$z)
@@ -196,17 +208,25 @@ declare function local:trash-bundle($path) as xs:string {
 
 };  
 
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+
 (: Zip the target and move to the tenant's Deleted collection. If the target is a bundle-doc, then the target is its parent. :)
+(:  THIS IS THE ENTRY POINT :)
 declare function local:do-trash() {
     let $path := request:get-parameter("path","")
     return if ($path eq $local:base-collection) 
     then (response:set-status-code(304),response:set-header("Location", request:get-url()))
     else
-    
+    let $trash-can := xmldb:create-collection($local:tenant-path, "trash")
+(:  A USER CAN DELETE AN ADMIN FILE - WHY??? WHERE ARE THE CHECKS?   :)
     let $real-path := $local:tenant-path || $path
     let $parent-collection := util:collection-name($real-path)
     let $quarantined := local:quarantined-path($parent-collection)
-    let $delete := if (local:is-bundle($path)) then local:trash-bundle($path) else local:trash-file-or-collection($path)
+    let $pekoe-log := util:log-app('warn', 'login.pekoe.io','********* NOTE: ' || $local:current-user/sm:username/string() || ' DELETED ' || $real-path)
+    let $delete := if (local:is-bundle($path)) 
+        then local:trash-bundle($path) 
+        else local:trash-file-or-collection($path)
                     
     return (local:redirect-to-browse($quarantined, 'browse',$delete))   
 };
@@ -225,14 +245,14 @@ declare function local:do-trash() {
     
 :)
 
-declare function local:trash() {
+(:declare function local:trash() {
     let $path := request:get-parameter("path","")
     return if ($path eq $local:base-collection) then  (response:set-status-code(304),response:set-header("Location", request:get-url()))
     else
     let $real-path := $local:tenant-path || $path
     let $parent-collection := util:collection-name($real-path)
-    (: First issue - how to handle BUNDLEs    :)
-    (: Second issue - remember to COPY and DELETE - don't use MOVE as its flawed.   :)
+    (\: First issue - how to handle BUNDLEs    :\)
+    (\: Second issue - remember to COPY and DELETE - don't use MOVE as its flawed.   :\)
     let $quarantined := local:quarantined-path($parent-collection)
     let $delete-log:= if (xmldb:collection-available($real-path)) 
                     then util:log("warn", "GOING TO TRASH COLLECTION (real-path)" || $real-path || " (path)" || $path )
@@ -243,7 +263,7 @@ declare function local:trash() {
                     
     return (local:redirect-to-browse($quarantined, 'browse','deleted the file'))   
     
-};
+};:)
 
 
 
@@ -338,6 +358,21 @@ declare function local:do-new() {
         return local:redirect-to-browse($path, "browse", $result )
 };
 
+declare function local:copy-move($collection, $parent-collection) {
+    (:xmldb:move($resource-full-path, $parent-collection) - causes a database error :)
+    if (xmldb:collection-available($collection)) then (
+    xmldb:copy($collection, $parent-collection),
+    xmldb:remove($collection))
+    else util:log('warn', '>>>>>>>>>>>>>>>>>>>>> UNABLE TO Copy/REMOVE COLLECTION ' || $collection) 
+};
+
+(: Copy move results in WRONG PERMISSIONS :)
+declare function local:copy-move($collection, $parent-collection, $resource-doc) {
+    (:    xmldb:move($collection, $parent-collection, $resource-doc):)
+    xmldb:copy($collection,$parent-collection, $resource-doc),
+    xmldb:remove($collection, $resource-doc)
+};
+
 declare function local:do-move-up(){
     let $resource := request:get-parameter("path",())
     let $resource-full-path := $local:tenant-path || $resource
@@ -351,9 +386,10 @@ declare function local:do-move-up(){
     
     let $log: = util:log('debug', '*************** MOVE ' || $resource || ' UP TO ' || $parent-collection || ' and redirect to ' || $original-collection)
     let $move := if ($resource-doc) 
-        then xmldb:move($collection, $parent-collection, $resource-doc)
-        else if ($parent-collection ne $local:tenant-path) then xmldb:move($resource-full-path, $parent-collection)
-        else ()
+        then local:copy-move($collection, $parent-collection, $resource-doc)
+        else if ($parent-collection ne $local:tenant-path) 
+            then local:copy-move($resource-full-path, $parent-collection)
+            else ()
     return local:redirect-to-browse($original-collection, "browse", "moved")
 };
 
@@ -366,7 +402,7 @@ declare function local:do-move(){
     let $original-collection := util:collection-name($resource)
     (: ************* TODO - replace xmldb:move with store and remove. Add check for existing file ******************    :)    
     
-    let $log: = util:log('info', '*************** MOVE ' || $resource-doc || ' INTO ' || $target || ' and redirect to ' || $original-collection)
+    let $log: = util:log('info', '*************** MOVE ' || $resource || ' INTO ' || $target || ' by USER ' || $local:current-user/sm:username/string())
     let $move := if ($resource-doc) 
         then xmldb:move(util:collection-name($resource-full-path), $target-full-path, $resource-doc)
         else if ($resource-full-path ne $target-full-path) then xmldb:move($resource-full-path,$target-full-path)
@@ -403,6 +439,8 @@ declare function local:do-rename(){
 (: ************************** MAIN QUERY *********************** :)
 
 (: THIS FILE HAS SETUID APPLIED. IT WILL RUN AS ADMIN. :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
+(: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
         
 (:        try {:)
     (: NO default action :)
@@ -410,7 +448,7 @@ declare function local:do-rename(){
     else if ($local:action eq "upload") then local:file-upload()
     else if ($local:action eq "upload-to-job") then local:file-upload-to-job()
     else if ($local:action eq "create")    then local:do-new()
-    else if ($local:action eq "delete") then local:do-delete()
+    else if ($local:action eq "delete") then local:do-trash()
     else if ($local:action eq "move")   then local:do-move()
     else if ($local:action eq "move-up") then local:do-move-up()
     else if ($local:action eq "rename") then local:do-rename()

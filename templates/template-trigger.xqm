@@ -19,11 +19,13 @@ import module namespace phtml="http://www.gspring.com.au/pekoe/merge/pekoe-html"
 import module namespace mailx="http://www.gspring.com.au/pekoe/merge/mailx" at "merge-mailx.xqm";
 import module namespace textx="http://www.gspring.com.au/pekoe/merge/textx" at "merge-textx.xqm";
 
-
 import module namespace rp = "http://pekoe.io/resource-permissions" at "../modules/resource-permissions.xqm";
 
 
 declare variable $tm:log-level external;
+
+
+(: ------------------- TRIGGER HANDLERS -------------------- :)
 
 declare function trigger:after-create-collection($uri) {
     tm:log(("AFTER CREATE COLLECTION ",$uri)),
@@ -35,19 +37,6 @@ declare function trigger:after-delete-collection($uri) {
     let $col := tm:tenant-meta-collection($uri) || substring-after($uri,"templates/")
     return if (xmldb:collection-available($col)) then xmldb:remove($col) else ()
 };
-declare function trigger:before-move-document($old-uri) {
-    tm:log(("BEFORE MOVE DOCUMENT ", $old-uri))
-    
-};
-(:
-declare function trigger:after-move-document($new-uri as xs:anyURI) {
-(\:   Move means that we should copy :\)
-    tm:log(("AFTER MOVE DOCUMENT ", $new-uri))
-(\:    ,
-    tm:created(xs:string($new-uri)):\)
-
-};:)
-
 
 declare function trigger:after-move-document($old, $new) {
     tm:log(("AFTER MOVE DOCUMENT old: ",$old, " new: ", $new)),
@@ -60,36 +49,8 @@ declare function trigger:after-move-collection($uri as xs:anyURI, $new-uri as xs
     tm:move-collection($uri, $new-uri)
 };
 
-declare function trigger:before-create-document($uri as xs:anyURI) {
-    tm:log(("BEFORE CREATE DOCUMENT ", $uri))
-};
-
 declare function trigger:after-create-document($uri as xs:anyURI) {
     tm:created(xs:string($uri))
-};
-
-declare function tm:move-collection($old-uri,$new-uri) {
-    (:  Going to assume that the collection already has all the right bits in it - so assume that it's not coming from outside of templates.   :)
-    let $source-collection := substring-before($old-uri, "/templates") || "/templates-meta" || substring-after($old-uri,"/templates")
-    let $new-collection := substring-before($new-uri, "/templates") || "/templates-meta" || substring-after($new-uri,"/templates")
-    let $target-collection := util:collection-name(substring-before($new-uri, "/templates") || "/templates-meta" || substring-after($new-uri,"/templates")) (: parent collection :)
-    
-    return if (xmldb:collection-available($source-collection) and xmldb:collection-available($target-collection)) then xmldb:move($source-collection, $target-collection) else tm:log('UNABLE TO MOVE')
-};
-
-(: get the parent-collection path in templates-meta for a document in templates :)
-declare function tm:col-meta-path($full-doc-path) {
-    let $doc-col := util:collection-name($full-doc-path)
-(:    let $col-debg := util:log("warn", "DOC COL IS " || $doc-col):)
-    return 
-    (substring-before($doc-col, "/templates") || "/templates-meta" || substring-after($doc-col,"/templates"))
-};
-
-declare function tm:full-meta-path($full-doc-path) { (: e.g. /db/pekoe/tenants/tdbg/templates/Programs/Wildlife-day.docx :)
-    let $doc-name := tm:good-name(util:document-name($full-doc-path))
-    let $doc-col := util:collection-name($full-doc-path)
-    return 
-    (substring-before($doc-col, "/templates") || "/templates-meta/" || substring-after($doc-col,"/templates") || "/" ||  $doc-name)
 };
 
 (: DELETE the bundle from templates-meta/
@@ -98,14 +59,6 @@ declare function tm:full-meta-path($full-doc-path) { (: e.g. /db/pekoe/tenants/t
 declare function trigger:after-delete-document($uri as xs:anyURI) {
     tm:log(("AFTER DELETE DOCUMENT", $uri)),
     tm:deleted(string($uri))   
-};
-
-(: Getting really untidy here. This module needs a rewrite. :)
-declare function tm:bundle-col($path as xs:string) {
-    let $col-path := tm:col-meta-path($path)
-    let $docname := util:document-name($path)
-    let $good-name := tm:good-name($docname)
-    return $col-path || '/' || $good-name
 };
 
 (: This is called when the document is replaced.
@@ -120,17 +73,50 @@ declare function trigger:after-update-document($uri as xs:anyURI) {
     tm:created(string($uri))
 };
 
+
+(: ---------------- Pekoe Template functions --------------------:)
+
+declare function tm:move-collection($old-uri,$new-uri) {
+    (:  Going to assume that the collection already has all the right bits in it - so assume that it's not coming from outside of templates.   :)
+    let $source-collection := substring-before($old-uri, "/templates") || "/templates-meta" || substring-after($old-uri,"/templates")
+    let $new-collection := substring-before($new-uri, "/templates") || "/templates-meta" || substring-after($new-uri,"/templates")
+    let $target-collection := util:collection-name(substring-before($new-uri, "/templates") || "/templates-meta" || substring-after($new-uri,"/templates")) (: parent collection :)
+    
+    return if (xmldb:collection-available($source-collection) and xmldb:collection-available($target-collection)) then xmldb:move($source-collection, $target-collection) else tm:log('UNABLE TO MOVE')
+};
+
+(: get the parent-collection path in templates-meta for a document in templates :)
+declare function tm:col-meta-path($full-doc-path) {
+    let $doc-col := util:collection-name($full-doc-path)
+    return 
+    (substring-before($doc-col, "/templates") || "/templates-meta" || substring-after($doc-col,"/templates"))
+};
+
+declare function tm:full-meta-path($full-doc-path) { (: e.g. /db/pekoe/tenants/tdbg/templates/Programs/Wildlife-day.docx :)
+    let $doc-name := tm:good-name(util:document-name($full-doc-path))
+    let $doc-col := util:collection-name($full-doc-path)
+    return 
+    (substring-before($doc-col, "/templates") || "/templates-meta/" || substring-after($doc-col,"/templates") || "/" ||  $doc-name)
+};
+
+
+(: Getting really untidy here. This module needs a rewrite. :)
+declare function tm:bundle-col($path as xs:string) {
+    let $col-path := tm:col-meta-path($path)
+    let $docname := util:document-name($path)
+    let $good-name := tm:good-name($docname)
+    return $col-path || '/' || $good-name
+};
+
 declare function tm:deleted($path as xs:string) {
    let $meta-col := tm:col-meta-path($path)
     let $docname := tokenize($path, '/')[position() eq last()]
     let $good-name := tm:good-name($docname)
     let $meta-path-to-bundle := $meta-col || "/" || $good-name
-    let $debg := util:log("warn", "TEMPLATE TRIGGER GOING TO DELETE COLLECTION " || $meta-path-to-bundle)
+    let $debg := tm:log("TEMPLATE TRIGGER GOING TO DELETE COLLECTION " || $meta-path-to-bundle)
     let $good-col := if (xmldb:collection-available($meta-path-to-bundle) and not(ends-with($meta-path-to-bundle, "/templates-meta"))) then xmldb:remove($meta-path-to-bundle) else ()
     return ()
 };
-
-
 
 declare function tm:created($path as xs:string) {
     (:    To create a collection, need the parent-collection and the new-col-name :)
@@ -142,25 +128,25 @@ declare function tm:created($path as xs:string) {
     let $good-col := rp:create-collection($col-path, $good-name)
     let $content-file := tm:extract-and-store-content-from($path,$good-col)
     let $p := tm:fix-permissions($good-col)
-    let $compiled-query := tm:generate-query-for($content-file,$good-col)
+    
     return ()
 };
 
 declare function tm:unlock-files($meta-col) {
     for $res in xmldb:get-child-resources($meta-col)
-    let $log := util:log('info', '^^^^^^^^^^^ TRIGGER CALLS LOCK ON ' ||$meta-col || '/' || $res)
+    let $log := tm:log( '^^^^^^^^^^^ TRIGGER CALLS LOCK ON ' ||$meta-col || '/' || $res)
     return rp:lock-file($meta-col || '/' || $res) (: What??? :)
 };
 
 
 declare function tm:fix-permissions($meta-col) {
     for $res in xmldb:get-child-resources($meta-col)
-    let $log := util:log('info', '^^^^^^^^^^^ TRIGGER CALLS UNLOCK ON ' ||$meta-col || '/' || $res)
+    let $log := tm:log('^^^^^^^^^^^ TRIGGER CALLS UNLOCK ON ' ||$meta-col || '/' || $res)
     return rp:unlock-file($meta-col || '/' || $res)
 };
 
 declare function tm:log($msgs as xs:string+) { 
-    util:log('warn', ("PEKOE ",$msgs))
+    util:log-app('warn','pekoe.io', ("PEKOE " || string-join($msgs,'. ')))
 };
 
 (:
@@ -198,18 +184,14 @@ declare function tm:tenant-meta-collection($uri) {
     return $tenant || '/templates-meta/'
 };
 
-declare function tm:create-meta-directory($template-path) {
-()
-};
 
 declare function tm:handle-xml-template($uri,$col) {
     let $doc-element := doc($uri)/*
     return typeswitch ($doc-element)
     case element(mail) return mailx:extract-content($uri,$col)
     case element(text) return textx:extract-content($uri,$col)
-   
-(:  TODO    ADD HTML TEMPLATE HANDLER  :)
-    default return util:log("warn", "UNKNOWN XML TEMPLATE DOCTYPE " || local-name($doc-element) )
+    (:  TODO    ADD HTML TEMPLATE HANDLER  :)
+    default return tm:log("UNKNOWN XML TEMPLATE DOCTYPE " || local-name($doc-element) )
 };
 
 
@@ -219,7 +201,6 @@ declare function tm:extract-and-store-content-from($uri,$col) {
         case "docx" return docx:extract-content($uri,$col)
         case "odt" return odt:extract-content($uri,$col)
         case "ods" return ods:extract-content($uri, $col)
-        
         case "txt" return ptxt:extract-content($uri,$col)
         case "xml" return tm:handle-xml-template($uri,$col)
         default return <unknown-doctype>{$doctype}</unknown-doctype>
@@ -248,10 +229,7 @@ It's in the word/_rels/document.xml.rels
 <Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="http://pekoe.io/bgaedu/school-booking/school/teacher?output=name" TargetMode="External"/>
                         
 :)
-declare function tm:generate-query-for($content-file,$col) {
-(: See merge-generators.xqm :)
-    ()
-};
+
 
 declare function tm:good-name($u) {
     replace($u, "[\W]+","_")

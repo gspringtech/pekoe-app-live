@@ -21,13 +21,13 @@ declare variable $local:all-prefs :=     doc('/db/pekoe/common/common-bookmarks.
 declare variable $local:admin-prefs :=   $local:all-prefs except $local:all-prefs[@for eq 'dba'];
 declare variable $local:common-prefs :=  $local:admin-prefs except $local:admin-prefs[@for eq "pekoe-tenant-admins"];
 
-declare variable $local:items := (collection($local:collection-path)/bookmarks/item);
+declare variable $local:items := (collection($tenant:tenant-path || '/config/users')//item);
 declare variable $local:tenant-admin-group := $tenant:tenant || '_admin';
 
 declare variable $local:doctype := "bookmarks";
 
 declare variable $local:view := request:get-parameter('view','');
-declare variable $local:current-collection := request:get-parameter('collection','/files');
+declare variable $local:current-collection := '/files';  (:request:get-parameter('collection','/files');:)
 
 (:  ----------------------------------------------------   MAIN QUERY ---------------------------------------- :)
 
@@ -60,7 +60,7 @@ let $content :=  map:new(($default-content,  map {
     Even variations in presentation of a field can be handled by simply defining a new column-heading and field?name.
 :)
     'column-headings': 
-         ['Title', 'Type','Parameters', 'Description']
+         ['Title', 'Type','Parameters', 'Code']
     ,
     'doctype' : $local:doctype,
     'row-attributes' : function ($item, $row-data) {
@@ -69,7 +69,8 @@ let $content :=  map:new(($default-content,  map {
         attribute class {$item/type/string()},
         attribute title {$item/title/string()},
         attribute data-title {$item/title/string()},
-        attribute data-type {$item/type/string()},
+        attribute data-type {"other"},
+(:        attribute data-type {$item/type/string()},:)
         attribute data-path {$item/href/string()},   
         attribute data-href {$item/href/string()}
         )
@@ -119,6 +120,11 @@ let $content :=  map:new(($default-content,  map {
                       order by $day/ad-date ascending
                       return  $day
                      }
+        },
+        'Code' : map {
+            'value' : function ($row, $row-data) {
+                $row/href/string()
+            }
         },
         'Description' : map {
              'value' : function ($row, $row-data) {

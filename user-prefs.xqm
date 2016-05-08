@@ -63,6 +63,7 @@ I could probably improve the code.
         
 :)
 
+
 declare namespace prefs = "http://pekoe.io/user-prefs";
 
 import module namespace pekoe-http = "http://pekoe.io/http" at "modules/http.xqm";
@@ -76,6 +77,7 @@ declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare variable $prefs:selected-tenant := req:header("tenant");
 declare variable $prefs:tenant-path := "/db/pekoe/tenants/" || $prefs:selected-tenant ;
 declare variable $prefs:config-collection-name := $prefs:tenant-path || "/config/users";
+(: THIS IS A PROBLEM when testing. sm-id throws an NPE when this module is used by another via an import. :)
 declare variable $prefs:user := sm:id()//sm:real/sm:username/text();
 declare variable $prefs:admin-group := "pekoe-tenant-admins";                                                       (: Awkward - but necessary. Members of <tenant>_admin should also belong to this group. OR MAYBE NOT:)
 declare variable $prefs:user-is-admin := sm:is-dba($prefs:user) or sm:id()//sm:real//sm:group = $prefs:admin-group;
@@ -86,6 +88,38 @@ declare variable $prefs:tenant-admin := $prefs:selected-tenant || "_admin";     
 declare variable $prefs:all-prefs :=     doc('/db/pekoe/common/common-bookmarks.xml')//item;
 declare variable $prefs:admin-prefs :=   $prefs:all-prefs except $prefs:all-prefs[@for eq 'dba'];
 declare variable $prefs:common-prefs :=  $prefs:admin-prefs except $prefs:admin-prefs[@for eq $prefs:admin-group];
+
+
+(:
+<jobowner disabled="">
+        <name>Alana Pianezzola</name>
+    <username pwd="fiddle-diddle">alana-p@cm</username>
+        <email>reception@conveyancingmatters.com.au</email>
+    <group>
+cm_admin
+cm_legal</group>
+</jobowner>
+:)
+
+declare 
+%rest:POST("{$body}")
+%rest:path("/pekoe/user/change")
+function prefs:change-user($body) {
+    util:log("warn","got here"),
+    util:log("warn",$body),
+
+        <hello>world</hello>
+};
+
+declare 
+%rest:POST("{$body}")
+%rest:path("/pekoe/user/notify")
+function prefs:notif-user($body) {
+    util:log("warn","got here"),
+    util:log("warn",$body),
+
+        <hello>world</hello>
+};
 
 
 declare

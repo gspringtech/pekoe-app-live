@@ -174,7 +174,7 @@ declare function merge:update-links-query($template, $tenant) {
     (: e.g. given      /db/pekoe/templates/Education/Tax-Invoice.docx,         
     return        /db/pekoe/templates-meta/Education/Tax_Invoice_docx/merge.xql   
     :)
-
+(:    let $log := util:log('warn', '999999999 Update Links query for $template:' || $template || ' and $tenant:' || $tenant):)
     let $template-bundle := merge:template-parts($template)
     let $schema-doctype := doc($template-bundle || '/links.xml')/links/string(@for)
     let $schema-path := merge:check-schema($schema-doctype,$tenant)

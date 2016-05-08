@@ -94,12 +94,12 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
         -->
         <xsl:variable name="first-field" select="(.//text:a)[1]/@xlink:href" />         
         <xsl:variable name="row-count" select="count($phlinks/link[@original-href eq $first-field]/*)" /> <!-- what if it's ZERO ???? -->
-        <xsl:message>TABLE ROW FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:message><!-- appears in the wrapper log -->
+        <!--xsl:message>TABLE ROW FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:message--><!-- appears in the wrapper log -->
         <xsl:variable name="this-row" select="." />
         
         <xsl:choose>
             <xsl:when test="$row-count eq 0">
-                <xsl:message>ROW COUNT ZERO: <xsl:value-of select='substring-after($first-field,"http://pekoe.io/")'/></xsl:message><!-- appears in the wrapper log -->
+                <!--xsl:message>ROW COUNT ZERO: <xsl:value-of select='substring-after($first-field,"http://pekoe.io/")'/></xsl:message--><!-- appears in the wrapper log -->
                 <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="0" as="xs:integer" tunnel="yes" /></xsl:apply-templates>
             </xsl:when>
 <!-- The problem occurs when the first field is an element, and the second field is NOT - just a string. -->
@@ -196,12 +196,12 @@ declare variable $odt:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org
         
         <xsl:choose>
             <xsl:when test="$index eq 0">
-                <xsl:message>TEXT index=zero for field <xsl:value-of select='$href' /></xsl:message>
+                <!--xsl:message>TEXT index=zero for field <xsl:value-of select='$href' /></xsl:message-->
                 <xsl:value-of select="$link/string(.)" />
             </xsl:when>
             <xsl:otherwise>
                 <!-- NOTE: must handle the case where the LINK does NOT contain an ELEMENT (and so $link/*[1] will be meaningless) -->
-                <xsl:message>TEXT index=<xsl:value-of select="$index" /> for field <xsl:value-of select='$href' /></xsl:message>
+                <!--xsl:message>TEXT index=<xsl:value-of select="$index" /> for field <xsl:value-of select='$href' /></xsl:message-->
                 <xsl:value-of select="if ($link/*) then ($link/*)[$index]/string(.) else $link/string(.)" />
             </xsl:otherwise>
         </xsl:choose>

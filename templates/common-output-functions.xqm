@@ -42,7 +42,7 @@ declare function pekoe:split-three($str) {
 
 (: TODO replace with format-number :)
 declare function pekoe:currency($any-val) {
-    if ($any-val eq '') then "" else
+    if (string($any-val) eq '') then "" else
     if (not($any-val castable as xs:decimal)) then concat("?(",$any-val,")?") else 
     
     let $val := if ($any-val castable as xs:decimal) then xs:decimal($any-val) else number("??")
