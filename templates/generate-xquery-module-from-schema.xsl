@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xd" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xd" version="2.0">
     <xsl:output indent="no" media-type="application/xquery" method="text"/>
     <xd:doc scope="stylesheet">
         <xd:desc>
@@ -14,29 +14,8 @@
                 the schema. These functions will be imported by the Template-Query when
                 Merging. </xd:p>
             <xd:p>
-                Every field can have one or more named-output formatters which will either be an XPath or a call to a Common XQuery Module Function 
-                (defined in pekoe-support/common.xqm).
-                
-                The desired function is either declared on the field-choice field
-                Or on the fragment-ref
-                Or the fragment
-                Or the field
-                
-                The correct function is the most specific:
-                least specific is defined on the fragment
-                next must be field
-                then fragment-ref
-                then field/@type=field-choice
-                
-                I will need to name these appropriately because otherwise there will be multiple functions of the same name 
-                and no way to separate them.
-                
-                THIS STEP SHOULD BE REMOVED.
-                
-*****
-I've changed the LOCAL NAME to "ps" for schema-module from <xsl:value-of select="$schema-root"/> - it's shorter and easier.
-It's doesn't affect the template.xql.
-                
+               OUTPUT FUNCTIONS are UNIQUELY NAMED. These are not METHODS. There is no possibility of
+                overriding a function at the top-level of the schema with one on a field.                
             </xd:p>
         </xd:desc>
     </xd:doc>
@@ -44,6 +23,7 @@ It's doesn't affect the template.xql.
     <xsl:template match="/schema">xquery version "3.0";
 module namespace ps="http://www.gspring.com.au/schema-module/<xsl:value-of select="$schema-root"/>";
 import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions" at "xmldb:exist://db/apps/pekoe/templates/common-output-functions.xqm";
+import module namespace site="http://gspring.com.au/pekoe/site-tools" at "../config/site-tools.xqm";
 <xsl:apply-templates/>
     </xsl:template>
     

@@ -89,8 +89,23 @@ declare variable $prefs:all-prefs :=     doc('/db/pekoe/common/common-bookmarks.
 declare variable $prefs:admin-prefs :=   $prefs:all-prefs except $prefs:all-prefs[@for eq 'dba'];
 declare variable $prefs:common-prefs :=  $prefs:admin-prefs except $prefs:admin-prefs[@for eq $prefs:admin-group];
 
+declare function prefs:new-user($username, $full-name, $tenant, $tenant-groups, $email, $password) {
+    let $primary-group:= $tenant || "_staff"
+    let $groups := ("pekoe-users","pekoe-tenants",$tenant-groups)
+    return sm:create-account($username, $password, $primary-group, $groups, $full-name, $email)
+};
 
 (:
+This is the post body sent by the jobowner schema script
+<jobowner disabled="">
+    <name>Sarah Pacchiano</name>
+    <username pwd="deceive-outdoors-coverage-barratry">sarah-p@cm</username>
+    <email>spacchiano@conveyancingmatters.com.au</email>
+    <group>
+cm_staff</group>
+    <office>Adelaide Office</office>
+</jobowner>
+
 <jobowner disabled="">
         <name>Alana Pianezzola</name>
     <username pwd="fiddle-diddle">alana-p@cm</username>
@@ -105,10 +120,13 @@ declare
 %rest:POST("{$body}")
 %rest:path("/pekoe/user/change")
 function prefs:change-user($body) {
-    util:log("warn","got here"),
-    util:log("warn",$body),
-
-        <hello>world</hello>
+    util:log-app("warn","pekoe.io","CREATING USER " || $body//name),
+    (let $groups := tokenize(normalize-space($body//group),"\s")
+    let $tenant := substring-before($groups[1],"_")
+    return
+    prefs:new-user($body//username/string(), $body//name/string(), $tenant, $body//email/string(), $groups, $body//username/@pwd/string())
+    ),
+        <result>Success</result>
 };
 
 declare 
@@ -211,6 +229,7 @@ declare function prefs:get-bookmarks() {
 declare function prefs:get-bookmarks() {
     let $screen-dimensions := (req:cookie('screenx'),req:cookie('screeny'))
     let $log := util:log-app('info','login.pekoe.io', $prefs:user || ' LOGGED-IN  TO ' || $prefs:selected-tenant || ' FROM ' || req:header('X-Real-IP') || ' SCREEN ' || string-join($screen-dimensions,'x'))
+    let $ua := util:log-app('info','pekoe.io','UA ' || req:header('User-Agent'))
     let $user-bookmarks := prefs:get-pref('bookmarks')
     let $common-prefs := if (sm:is-dba($prefs:user)) then $prefs:all-prefs else if ($prefs:user-is-admin) then $prefs:admin-prefs else $prefs:common-prefs
 

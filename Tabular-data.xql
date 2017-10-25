@@ -27,7 +27,6 @@ import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/
 import module namespace pqt="http://gspring.com.au/pekoe/querytools" at "xmldb:exist:///db/apps/pekoe/modules/querytools.xqm";
 import module namespace rp="http://pekoe.io/resource-permissions" at "xmldb:exist:///db/apps/pekoe/modules/resource-permissions.xqm";
 
-
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare option output:method "html5";
 declare option output:media-type "text/html";
@@ -202,6 +201,25 @@ declare function local:delete() {
 };
 
 
+declare function local:map-params(){
+    map:new(
+        for $p in tokenize(request:get-query-string(),'&amp;')
+        let $param := tokenize($p,'=')
+        return map:entry($param[1],$param[2])
+    )
+};
+
+declare function local:serialize-map-params($m) {
+    string-join(map:for-each-entry($m,function($k,$v){
+        $k || '=' || $v
+    }),'&amp;')
+};
+
+declare function local:fix-params() {
+    let $pmap := local:map-params()
+    let $updated := map:new(($pmap, map {'p':'last'}))
+    return local:serialize-map-params($updated)
+};
 
 (:  ----------------------------------------------------   MAIN QUERY **** SetUID applied **** ---------------------------------------- :)
 (: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
@@ -211,15 +229,17 @@ declare function local:delete() {
 (: BUGGER - not quite right. The permissions are checked using the COLLECTION - just like I do for a normal resource. This means that the actual permissions of the resource
      are not considered. The only requirement is to be a member of the parent-collection's owner-group.
      :)
-let $edits := if (rp:resource-permissions($local:selected-resource)?user-can-edit) 
-                then (
-                switch ($local:form-action)
-                    case 'update' return local:update()
-                    case 'new' return local:new()
-                    case 'delete' return local:delete()
-                    default return ()
-                ) 
-            else (util:log-app('warn','login.pekoe.io', '#### USER ' || sm:id()//sm:real//sm:username/string() || ' TRIED TO ' || $local:form-action || ' in ' || $local:selected-resource))
+if (request:get-method() eq 'POST') then 
+    if (rp:resource-permissions($local:selected-resource)?user-can-edit) 
+        then (
+        switch ($local:form-action)
+            case 'update' return (local:update(), response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
+            case 'new' return (local:new(), response:set-status-code(303), response:set-header('location', '?' || local:fix-params()))
+            case 'delete' return (local:delete(), response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
+            default return (response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
+        ) 
+    else (util:log-app('warn','login.pekoe.io', '#### USER ' || sm:id()//sm:real//sm:username/string() || ' TRIED TO ' || $local:form-action || ' in ' || $local:selected-resource))
+else
            
 
 let $conf := map {
@@ -299,10 +319,13 @@ let $content :=  map:new(($default-content,  map {
                     $fg.append('<label></label>').attr('for', fname).text(fname);
                     var $dataType = "text"; // maybe add other things like password?
                     var $inp = $('<input type="text" class="form-control"/>').attr('id',fname).attr('name',fname);
+                    if (fname.endsWith('-date')) {$inp.addClass('date');}
                     if (!asNew) {$inp.val($(this).text());}
                     $fg.append($inp);
                     $form.append($fg);
                 }); // it may be long but it WILL scroll
+                
+                $('.date').datepicker({ dateFormat: 'yy-mm-dd' });
                 
                 $deleteBtn.on('click',function () {
                     if (confirm("Do you want to delete this record?")) {
@@ -311,22 +334,12 @@ let $content :=  map:new(($default-content,  map {
                     }
                 });
                 
-                $savebtn.on('click', function () {  
+                $savebtn.on('click', function () {
                     $form.submit();
+                    
                 });
                 $modal.modal();
-                /*
-                $form.on('submit',function() {
-                    if (asNew) {
-                        console.log('you want to submit a NEW RECORD');
-                    } else {
-                        console.log('you want to submit changes to ',$tr.data('record'));
-                        $.post(location.href,{'nodeid': $tr.data('record'), $form. 
-                    }
-                    return false;
-                });
-                */
-        
+       
         
         }
         
@@ -362,7 +375,6 @@ let $content :=  map:new(($default-content,  map {
             
             $('#pNewRecordBtn').on('click', function (e) {
                 var $tr = $('tr[data-record]:first');
-                console.log($tr);
                 tdUpdate($tr,true); // NEW RECORD
             });
 

@@ -17,6 +17,7 @@ declare variable $mailx:repair-xmail-stylesheet := "repair-mailx.xsl";
 
 declare variable $mailx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
     xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl"
+    xmlns:h="http://www.w3.org/1999/xhtml"
     exclude-result-prefixes="xs xd" version="2.0">
     <xd:doc scope="stylesheet">
         <xd:desc>
@@ -32,35 +33,35 @@ declare variable $mailx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.o
     <xsl:param name="tenant-path" />
     <xsl:variable name="path-to-template-content" select="concat('xmldb:exist://', $template-content )" />
     <xsl:variable name="phlinks" select="/links"/> <!--  a reference to the root is needed because another document is imported. -->
-
-
+    
+    
     <xsl:template match="/">
         <xsl:choose>
             <xsl:when test='doc-available($path-to-template-content)'>
                 <xsl:apply-templates select=" doc( $path-to-template-content )/* "/> 
             </xsl:when>
             <xsl:otherwise>
-                <error>Permission Denied</error>
+                <error>Permission Denied or Template-content not found</error>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
     
-        <xsl:template match="node() | @*">
+    <xsl:template match="node() | @*">
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>
         </xsl:copy>
     </xsl:template>
-
-<!-- 
+    
+    <!-- 
     The output function should handle results containing more than one value - for example, using a string-join($v,', ')
     If there are multiple elements in the link, it's expected that the hyperlink will be within a table-row/table-cell.
     The row will be repeated for each element in the first cell.
     Any other cells containing hyperlinks will be processed using the current index.
 -->
-
-       <!-- I'm not handling TABLES in Mail messages. I will need to. -->
-
-<!-- Replace a hyperlink by its content
+    
+    <!-- I'm not handling TABLES in Mail messages. I will need to. -->
+    
+    <!-- Replace a hyperlink by its content
   <a href="http://pekoe.io/bkfa/ad-booking/org">REPLACE</a>
  
     -->
@@ -74,7 +75,6 @@ declare variable $mailx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.o
     
     <!-- This form is for when the attachment is stored in the job-bundle. The Template's placeholder will be replaced with an Anchor.   -->
     <xsl:template match="attachment[a]">
-
         <xsl:variable name="href" select="a/@href" />  
         <!-- The problem is happening because I'm adding two local files. I think there should be a for-each or something.  -->
         <xsl:variable name="link" select="($phlinks/link[@original-href eq $href]/*)/normalize-space(string(.))" />
@@ -82,7 +82,7 @@ declare variable $mailx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.o
             <xsl:choose>
                 <xsl:when test='starts-with(., "files/")' >
                     <attachment><xsl:value-of select="$tenant-path" /><xsl:value-of select='.' /></attachment>
-                    </xsl:when>
+                </xsl:when>
                 <xsl:when test='. eq ""' ></xsl:when>
                 <xsl:otherwise>
                     <attachment><xsl:value-of select="$job-path" />/<xsl:value-of select='.' /></attachment>
@@ -90,14 +90,52 @@ declare variable $mailx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.o
             </xsl:choose>
         </xsl:for-each>
     </xsl:template>
-
-    <xsl:template match="a">        
-        <xsl:variable name="href" select="@href" />         
-        <xsl:value-of select="$phlinks/link[@original-href eq $href]/normalize-space(string(.))" />
+    
+    <xsl:template match="h:tr[.//a[starts-with(@href, 'http://pekoe.io')]]">
+        <xsl:variable name="first-field" select="(.//a)[1]/@href" />         
+        <xsl:variable name="row-count" select="count($phlinks/link[@original-href eq $first-field]/*)" /> <!-- what if it's ZERO ???? -->
+        <xsl:comment>TABLE ROW FIELD COUNT: <xsl:value-of select='$row-count' /> for <xsl:value-of select='$first-field'/></xsl:comment><!-- appears in the wrapper log -->
+        <xsl:variable name="this-row" select="." />
+        
+        <xsl:choose>
+            <xsl:when test="$row-count eq 0">
+                <!--xsl:message>ROW COUNT ZERO: <xsl:value-of select='substring-after($first-field,"http://pekoe.io/")'/></xsl:message--><!-- appears in the wrapper log -->
+                <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="0" as="xs:integer" tunnel="yes" /></xsl:apply-templates>
+            </xsl:when>
+            <!-- The problem occurs when the first field is an element, and the second field is NOT - just a string. -->
+            <xsl:otherwise>
+                <xsl:for-each select="1 to $row-count"><!-- context is now the index number - hence the use of a variable in the select...  -->
+                    <xsl:apply-templates select="$this-row" mode="copy"><xsl:with-param name="index" select="." as="xs:integer" tunnel="yes" /></xsl:apply-templates> 
+                </xsl:for-each>        
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
-
-
-
+    
+    <xsl:template match="h:tr" mode="copy">     
+        <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
+        <xsl:copy>
+            <xsl:apply-templates  mode="#default" />
+        </xsl:copy>
+    </xsl:template>
+    
+    <xsl:template match="a">
+        <xsl:param name="index" select="0" tunnel="yes"/> <!-- NOTE - MUST indicate that we EXPECT a tunnelled param here. -->
+        <xsl:variable name="href" select="@href" /> 
+        <xsl:variable name="link" select="$phlinks/link[@original-href eq $href]" />
+        
+        <xsl:choose>
+            <xsl:when test="$index eq 0">
+                <!--xsl:message>TEXT index=zero for field <xsl:value-of select='$href' /></xsl:message-->
+                <xsl:value-of select="$link/string(.)" />
+            </xsl:when>
+            <xsl:otherwise>
+                <!-- NOTE: must handle the case where the LINK does NOT contain an ELEMENT (and so $link/*[1] will be meaningless) -->
+                <!--xsl:message>TEXT index=<xsl:value-of select="$index" /> for field <xsl:value-of select='$href' /></xsl:message-->
+                <xsl:value-of select="if ($link/*) then ($link/*)[$index]/string(.) else $link/string(.)" />
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+    
 </xsl:stylesheet>
 ; (: --------------------- END OF XML STYLESHEET ------------------:)
 

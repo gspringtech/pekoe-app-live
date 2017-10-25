@@ -1,5 +1,9 @@
 xquery version "3.1";
 
+(: This module is no longer relevant. 
+    Instead, the "select-property-list" element in the schema
+    is replaced by the actual "list" element ON DEMAND. 
+    :)
 module namespace properties="http://pekoe.io/properties";
 
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";

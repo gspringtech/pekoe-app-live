@@ -31,20 +31,28 @@ let $from-name := $message/mail:from/string(@personal)
 let $addr := $message/mail:from/string()
 let $subject := encode-for-uri($message/mail:subject)
 return 
-<html><head><title>Read Mail</title></head><body>
+<html><head><title>Read Mail</title>
+<style type='text/css'> /* <![CDATA[ */
+pre {
+    white-space: pre-wrap; 
+    width: 800px;
+}
+/* ]]> */
+</style>
+</head><body>
  <a href='javascript:history.back()'>Go back</a>
  <h1>Subject: {$message/mail:subject/string()}</h1>
  <h3>Sent: {if ($sent castable as xs:dateTime) then format-dateTime($sent, "[FNn], [D1o] [MNn] at [h].[m01][Pn]") else "???"}</h3>
  <h3>From: {if ($from-name) then $from-name else $addr}</h3>
  <h4><a href='mailto:{$addr}?subject={$subject}&amp;cc=pekoe@conveyancingmatters.com.au'>Reply</a></h4>
- <div>{ if ($message/mail:xhtml) then $message//html/* else $message/mail:text/text() }
- </div>
+ { for $t in $message/mail:text return <pre>{string($t)}</pre> }
+ { for $t in $message/mail:xhtml return <div>{$t/html/body/*}</div> }
  </body></html>
  )
 else 
 (: To begin coding this page, I copied from Tabular-data. But it's not boilerplate code - everything needs to be modified.
 Also, something like AD-Bookings is a better model. :) 
-let $log := util:log('warn','RMAIL collection ' || $tenant:tenant-path || $local:collection) 
+(:let $log := util:log('warn','RMAIL collection ' || $tenant:tenant-path || $local:collection) :)
 let $conf := map {
     'doctype' : function ($item) { $local:doctype } ,
     'display-title' : function ($item) {  $item/mail:subject/string() }
@@ -54,7 +62,7 @@ let $default-content := lw:configure-content-map($conf)
 
 let $content :=  map:new(($default-content,  map {
     'title' : 'Read Mail',
-    'column-headings': ['Date', 'From', 'Subject','Comments'], 
+    'column-headings': ['Date', 'From', 'Subject','Comments','Mail'], 
     'path-to-me' : '/exist/pekoe-app/Read-mail.xql',
     'hidden-menus' : map:new(($default-content?hidden-menus, map {'delete': false()})),    
     'row-attributes' : function ($item, $row-data) {
@@ -96,6 +104,11 @@ let $content :=  map:new(($default-content,  map {
         'Comments' : map {
             'value':function($message, $row-data) {
               $message//rejection/string()
+            }
+        },
+        'Mail' : map {
+            'value':function($message, $row-data) {
+              <a href='message:http://cm.pekoe.io/exist/rest{base-uri($message)}'>read in Mail app</a>
             }
         }
     },

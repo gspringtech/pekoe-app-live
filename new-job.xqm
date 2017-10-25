@@ -42,7 +42,8 @@ declare variable $job:config := map {
 
 (: ------------------------------------------------  MAIN FUNCTION. Save (POST) or 'action' Capture, Release --------------------------------------- :)
 declare function job:process($config as map(*)) {
-    if (request:get-method() eq 'POST') then  $config?save-fn($config)
+    if (request:get-method() eq 'POST') then 
+        $config?save-fn($config)
     else
         switch (request:get-parameter('action',''))
         case "capture"  return job:capture($config)

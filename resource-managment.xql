@@ -163,6 +163,11 @@ declare function local:store($data, $fullpath) {
     let $local-part := substring-after($collection-path,$local:tenant-files)
     let $local-path := if (starts-with($local-part, '/')) then substring-after($local-part,'/') else $local-part
     let $goodCollection := if (not(xmldb:collection-available($collection-path))) then rp:create-collection($local:tenant-files,$local-path) else $collection-path
+    let $backup-text := if (not(contains($fullpath,'/templates/'))) 
+        then xmldb:store($goodCollection, "dbu-"  || substring-before($resource-name,".xml") || format-dateTime(current-dateTime(),"-[Y][M01][D01][H01][m01][s01]") || ".txt", $data, "text/plain")
+        else ()
+(:    let $backup := xmldb:store($goodCollection, "dbu-"  || substring-before($resource-name,".xml") || format-dateTime(current-dateTime(),"-[Y][M01][D01][H01][m01][s01]") || ".txt", $data, "text/plain"):)
+    
     let $result := xmldb:store($goodCollection,$resource-name, $data)
     let $update-permissions :=   local:set-open-for-editing(xs:anyURI($fullpath))
     return if ($result) then

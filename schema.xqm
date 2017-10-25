@@ -21,29 +21,7 @@ declare variable $pekoe-schema:common := "/db/pekoe/common/schemas";
 
 
 :)
-(:
-declare
-%rest:GET
-%rest:path("/pekoe/schema/{$for}")
-%rest:produces("application/xml")
-%output:media-type("application/xml")
-function pekoe-schema:get-schema($for) {
-    let $local-schema := collection($pekoe-schema:tenant-path)/schema[@for eq $for]
-    
-    return 
-        if (not(empty($local-schema)))
-        then  $local-schema
-        else 
-            let $default-schema := collection($pekoe-schema:common)/schema[@for eq $for]
-(\:            let $log := util:log("debug", "SCHEMA FOR " || $for || " is " || $default-schema):\)
-            return
-                if (not(empty($default-schema))) then $default-schema
-                else                
-                <rest:response>
-                     <http:response status="{$pekoe-http:HTTP-404-NOTFOUND}"/>
-                 </rest:response>
 
-};:)
 
 (: Rather than having to create a list of paths every time, why don't I store them somewhere? Config? Next to the schema?
 :)

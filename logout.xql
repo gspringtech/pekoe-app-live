@@ -29,7 +29,7 @@ declare function local:find-my-files() {
 :)
     for $doc in collection($local:tenant-path || "/files")/*[sm:get-permissions(xs:anyURI(document-uri(root(.))))/sm:permission/@owner eq $local:current-user]
     let $path := document-uri(root($doc))
-    let $debug := util:log("debug",  "GOING TO CLOSE USER FILE " || $path)
+    let $debug := util:log("WARN",  "LOGOUT CLOSING FILE " || $path)
     let $p := rp:resource-permissions(xs:string($path))
     let $chown := sm:chown($path, $p("col-owner"))
     let $chmod := sm:chmod($path, $rp:closed-and-available)
@@ -38,7 +38,7 @@ declare function local:find-my-files() {
 
 declare function local:close-resource($col, $res) {
     let $p := rp:resource-permissions(xs:string($res))
-(:    let $log := util:log-app("warn", "login.pekoe.io","USER " || $local:current-user || " did not close " || $res || " USING " || $p("col-owner")):)
+    let $log := util:log-app("warn", "login.pekoe.io","USER " || $local:current-user || " did not close " || $res || " USING " || $p("col-owner"))
     return if ($p("col-owner") eq "admin") then util:log-app("warn","login.pekoe.io", "PEKOE ADMIN OWNS COLLECTION " || $col)
     else (
     let $chown := sm:chown($res, $p("col-owner"))
@@ -48,9 +48,8 @@ declare function local:close-resource($col, $res) {
 };
 
 declare function local:close-all() {
-
 dbutil:scan(xs:anyURI($local:tenant-path || '/files'), function($col, $res) {
-   if ($res and ends-with($res, '.xml')) then 
+   if ($res and ends-with($res, '.xml') and not($res eq 'S3-TOC.xml')) then 
        if (sm:get-permissions($res)/sm:permission/@owner eq $local:current-user)
        then local:close-resource($col, $res)
        else ()

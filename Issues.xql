@@ -73,7 +73,7 @@ let $content :=  map:new(($default-content,  map {
             'value': function ($item,$row-data) { attribute title {$item/@created-dateTime/format-dateTime(.,"[h].[m01][Pn] on [FNn], [D1o] [MNn]") }, $item/@created-by/string() }            
         },
         'Created' : map {
-            'value': function ($item,$row-data) { $item/@created-dateTime/format-dateTime(.,$lw:aust-date-picture) },
+            'value': function ($item,$row-data) { $item/@created-dateTime/format-dateTime(.,'[Y0001]-[M01]-[D01]') },
             'sort-key' : 'created-date',
             'sort' : function ($direction, $items) { 
                 if ($direction eq "ascending") then 

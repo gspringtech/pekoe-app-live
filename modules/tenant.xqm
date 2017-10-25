@@ -8,7 +8,8 @@ module namespace tenant = "http://pekoe.io/tenant";
 (:declare variable $tenant:standard-request-cookie := request:get-cookie-value("tenant");:)
 (:declare variable $tenant:accessible-cookie := if ($tenant:cookie) then $tenant:cookie else ""; (\:$tenant:standard-request-cookie;:\):)
 declare variable $tenant:accessible-cookie := request:get-cookie-value("tenant");
-declare variable $tenant:tenant := replace($tenant:accessible-cookie,"%22","");
+declare variable $tenant:tenant-from-cookie := replace($tenant:accessible-cookie,"%22","");
+declare variable $tenant:tenant := if ($tenant:tenant-from-cookie eq '') then request:get-header('tenant') else $tenant:tenant-from-cookie;
 declare variable $tenant:tenant-path := "/db/pekoe/tenants/" || $tenant:tenant;
 
  declare function tenant:fix-serial-numbers($tenant) {
@@ -34,7 +35,7 @@ declare variable $tenant:tenant-path := "/db/pekoe/tenants/" || $tenant:tenant;
     sm:chown($collection,$owner-name),
     sm:chgrp($collection,$group-name),
     sm:chmod($collection, 'rwxrwx---'),
-    for $r in xmldb:get-child-resources(string($collection))
+    for $r in xmldb:get-child-resources(string($collection))[substring-after(.,'.') = ('ods','odt')]
     let $resource := xs:anyURI($collection || "/" || $r)
     return (
         sm:chown($resource,$owner-name),

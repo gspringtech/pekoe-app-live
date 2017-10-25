@@ -72,11 +72,13 @@ declare function lw:configure-content-map($config-map) {
         map {
         (: For each restricted menu item or other action, add a key. These can be overriden by the query.       :)
         'hidden-menus' : map {
-            'rename': true(), 
-            'move-up' : not(sm:is-dba(sm:id()//sm:real/sm:username/string())) , 
-            'delete' : false(), (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())) ,:) 
-            'unlock':  false() (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())):)
-            
+             'rename'       : not(sm:is-dba(sm:id()//sm:real/sm:username/string())) 
+            ,'move-up'      : not(sm:is-dba(sm:id()//sm:real/sm:username/string())) 
+            ,'delete'       : false() (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())) ,:) 
+            ,'unlock'       : false() (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())):)
+            ,'export-csv'   : false()  (:not(sm:is-dba(sm:id()//sm:real/sm:username/string())):)
+            ,'all-to-s3'    : not(sm:is-dba(sm:id()//sm:real/sm:username/string()))
+            ,'retrieve-from-s3'    : not(sm:is-dba(sm:id()//sm:real/sm:username/string()))
         },
         'breadcrumbs' : lw:breadcrumbs('/exist/pekoe-app/files.xql?collection=',$lw:quarantined-path),
         'path' : request:get-parameter("collection", $lw:base-collection-path),  (: default is /files. Override this. :)
@@ -91,15 +93,15 @@ declare function lw:configure-content-map($config-map) {
             let $display-title := $custom-conf?display-title($item)           
             let $permissions := lw:doc-permissions($colName || '/' || $child)
             let $doctype := $custom-conf?doctype($item)
-            return
-            ( 
-            if ($permissions?available) 
-            then ( attribute title {$quarantined-path}, attribute class {if ($permissions?owner-is-me) then "locked-by-me xml" else "xml"})
-            else (   attribute title {'locked by ' || $permissions?owner}, attribute class {'locked xml'}),
-            attribute data-title {$display-title}, 
-            attribute data-href {$doctype || ":" || $path },
-            attribute data-path {$quarantined-path},
-            attribute data-type {'form'})
+            return ( 
+                if ($permissions?available) 
+                    then ( attribute title {$quarantined-path}, attribute class {if ($permissions?owner-is-me) then "locked-by-me xml" else "xml"})
+                    else (   attribute title {'locked by ' || $permissions?owner}, attribute class {'locked xml'}),
+                attribute data-title {$display-title}, 
+                attribute data-href {$doctype || ":" || $path },
+                attribute data-path {$quarantined-path},
+                attribute data-type {'form'}
+            )
         },
         
         'row-function' : function ($row) {
@@ -290,6 +292,22 @@ declare function lw:xpath-search() {
     return $results    
 };
 
+declare function lw:xpath-search-in-collection($col) {
+    let $search := request:get-parameter("xpath",())
+    let $cu-name := sm:id()//sm:real/sm:username/string() (:$lw:current-user/sm:username/string():)
+    let $check := if (matches($search,'util:eval|update|system|xmldb')) 
+        then (util:log-app('warn','login.pekoe.io','%%%%%%%%%%%% USER ' || $cu-name || ' ATTEMPTED UNSAFE SEARCH: ' || $search),
+            error((),'User ' || $cu-name || ' attempted unsafe search. This has been reported.')) 
+        else ()
+    let $colpath := $col
+    
+    let $map := lw:parse-xpath($search)
+    
+    let $xpathsearch := concat("collection('",$colpath,"')", $map?xpath )
+    let $debug := util:log('info','XPATH SEARCH ' || $xpathsearch)
+    let $results  := util:eval($xpathsearch) (: get all the result nodes :)
+    return $results    
+};
 
 declare function lw:user-is-admin() {
     sm:is-dba(sm:id()//sm:real/sm:username/string()) or sm:get-user-groups(sm:id()//sm:real/sm:username/string()) = $lw:tenant-admin-group
@@ -365,6 +383,10 @@ declare function lw:preferred-list-rpp() {
     return xs:integer($rpp)
 };
 
+declare function lw:get-page-number($max) {
+    let $p := request:get-parameter('p', 1)
+    return if ($p castable as xs:integer) then xs:integer($p) else if ($p eq 'last') then $max else 1
+};
 
 (:~
 : @param $params - the static uri parameters for the breadcrumb link
@@ -389,9 +411,10 @@ declare function lw:pagination-map($content) {
 (: items, rpp, start, end, current, total, params :)
     
     let $records-per-page := lw:preferred-list-rpp() (: ***  It would be preferable to make this device dependent :)
-    let $current-page := local:get-request-as-number("p",1)
+(:    let $current-page := local:get-request-as-number("p",1):)
     let $count := count($items)
     let $total-pages := xs:integer(ceiling($count div $records-per-page))
+    let $current-page := lw:get-page-number($total-pages)
     let $start-index := xs:integer(($current-page - 1) * $records-per-page + 1 )
     let $end-index := xs:integer($start-index + $records-per-page - 1)
     
@@ -717,6 +740,7 @@ return
         <script type='text/javascript' src='/pekoe-common/jquery/dist/jquery.js' ></script>
         <script type='text/javascript' src="/pekoe-common/jquery-ui-1.11.0/jquery-ui.js" ></script>
         <script type='text/javascript' src='/pekoe-common/dist/js/bootstrap.min.js' ></script>
+        <script type='text/javascript' src='/pekoe-common/excellentexport.js' ></script>
         <script type='text/javascript' src='/pekoe-common/list/pekoe-list-widget.js'></script>
         { comment { 'path:' || $original-content?path } }
         { comment { 
@@ -876,7 +900,30 @@ return
                     
                    Use config to hide for non-dba
                    rename, move-up, delete, unlock 
-            -->    
+            -->
+            
+            IT would appear that I need to convert this Menu to a Map which can be modified in the Files.xql or other Lists.
+            The File Menu itself should remain Active at all times, but the individual elements should respond to selection criteria.
+            Also, there's a need for Multiple File Selection.
+            Bugger - that's a lot of work.
+            I think the biggest problem is the Selection Criteria.
+            For example, some of these items should only apply to Files, others might apply to Collections.
+            The Move to S3 will only apply to local Binaries.
+            I think I can safely say that if the user has created the S3 TOC, they'll want to move EVERYTHING to S3.
+            There are only a few things that shouldn't be moved to S3.
+            
+            The selection criteria is best supplied by the Query which generates the List.
+            there should be a map for each Item
+            
+            map { 
+                title: 'Show data', 
+                href: "/exist/pekoe-app/manage-files.xql", 
+                criteria : 'javascript function?' or 'selected data-file' where the data-file is a flag or class    eg "text active" or "xml active"
+                
+                This suggests that the criteria must be reviewed each time the mouse is clicked. Hmmm.
+                Starting to wish I'd built with React here. Can I change? 
+                What about a ClojureScript-React version of the List module? Just for laughs?
+                Or more seriously, a React version (so I can learn it).
             :)
               }
               
@@ -893,12 +940,22 @@ return
                 <li role="presentation"><a class='menuitem' tabindex="-1"                 href='#' id='openItemTab'   >Open in new tab</a></li>                
             {if ($hide-menu('unlock')) then () else 
                 <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='unlock'>Unlock</a></li>}
+            {if ($hide-menu('all-to-s3')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='all-to-s3'>Move ALL to S3</a></li>
+            }
+            {if ($hide-menu('retrieve-from-s3')) then () else 
+                <li role="presentation"><a class='menuitem' role="menuitem" tabindex="-1" href="/exist/pekoe-app/manage-files.xql" data-action='retrieve-from-s3'>Retrieve from S3</a></li>
+            }
               </ul>
             </div>            
             <button onclick='window.print();' id='printBtn' type='button' class='btn btn-default'><i class='glyphicon glyphicon-print'></i> Print</button>
-            {if ($content?allow-export eq true()) then 
+            {if ($hide-menu('export-csv')) then () else 
+                <a class='btn' href='#' download='{replace($content?title,"\s","-")}.csv' onclick='return ExcellentExport.csv(this, "pDataTable");'><i class='glyphicon glyphicon-download-alt'></i> Export</a>
+            }
+            {()
+            (:if ($content?allow-export eq true()) then 
             <button onclick='location.href="{request:get-uri()}?{string-join(("download", request:get-query-string()),'&amp;')}"' id='exportBtn' type='button' class='btn btn-default'><i class='glyphicon glyphicon-download-alt'></i> Export</button>
-            else ()
+            else ():)
             }
             <button id='refresh' type='button' class='btn btn-default'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>  
         </div>
@@ -928,7 +985,7 @@ return
     </div>
     <div class='table-responsive'>
     {
-    <table class='table'>
+    <table class='table' id='pDataTable'>
                 <thead>
                 <tr>{ array:for-each($content('column-headings'), lw:make-column-heading(?,$content)) }</tr>
                 {if (map:contains($content,'new-item-tr')) then $content?new-item-tr else () }

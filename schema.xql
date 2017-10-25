@@ -1,5 +1,6 @@
 (:
     Get the appropriate schema
+    I should move all these functions into the schema.xqm so that it can be more easily tested in eXide.
 :)
 xquery version "3.0"; 
 declare namespace pekoe-schema = "http://pekoe.io/schema";
@@ -10,17 +11,35 @@ import module namespace list-wrapper = "http://pekoe.io/list/wrapper" at "list-w
 declare option output:method "html5";
 declare option output:media-type "text/html";
 
-(:declare variable $schema:selected-tenant := req:header("tenant");:)
 declare variable $pekoe-schema:tenant := replace(request:get-cookie-value("tenant"),"%22","");
 declare variable $pekoe-schema:tenant-path := "/db/pekoe/tenants/" || $pekoe-schema:tenant ;
 declare variable $pekoe-schema:common := "/db/pekoe/common/schemas";
+declare variable $pekoe-schema:tenant-properties := collection($pekoe-schema:tenant-path)//property;
+
+
+(: Replace "select-property-list" with the actual generated List of property values. :)
+(: Use identity transform to replace select-property-list with a generated list.  :)
+(: This is really what I wanted to do with schema components! :)
+declare function local:replace-property-lists($element as node()) {
+   if (name($element) eq "select-property-list") then <list>{$pekoe-schema:tenant-properties[@name eq $element/text()]/string-join(value,'&#10;')}</list>
+   else
+   element {node-name($element)}
+      {$element/@*,
+          for $child in $element/node()
+              return
+               if ($child instance of element())
+                 then local:replace-property-lists($child)
+                 else $child
+      }
+};
+
+
 
 (:
-    Not quite so simple.
-    Will need to check the default schemas and then add the tenant's schemas
-    
+    Get a schema for this doctype. Prefer the Local to the Common.
+    If Local, replace any select-property-list elements with a generated list from the tenant's properties.
+    REMEMBER, these paths are /exist/restxq/pekoe/schema/...
 :)
-
 declare
 %rest:GET
 %rest:path("/pekoe/schema/{$for}")
@@ -31,7 +50,7 @@ function pekoe-schema:get-schema($for) {
     
     return 
         if (not(empty($local-schema)))
-        then  $local-schema
+        then  local:replace-property-lists($local-schema)
         else 
             let $default-schema := collection($pekoe-schema:common)/schema[@for eq $for]
             return
@@ -73,6 +92,16 @@ declare function pekoe-schema:make-paths($link-path, $pekoe-schema) {
             
 };
 
+declare 
+%rest:GET
+%rest:path("/pekoe/schema/{$for}/paths")
+%rest:produces("application/xml")
+%output:media-type("application/xml")
+function pekoe-schema:list-paths($for) {
+    for $root-field in (collection($pekoe-schema:tenant-path)/schema[@for eq $for],collection($pekoe-schema:common)/schema[@for eq $for])[1]/field
+    return <path>{$root-field/@path/string()}</path>
+};
+
 declare function pekoe-schema:output-functions($f) {
     if ($f instance of element(field)) then 
         if ($f/input/@type ne 'field-choice') then $f/output/string(@name)[. ne '']
@@ -94,6 +123,7 @@ declare function pekoe-schema:field-choice-outputs($f) {
     return $root//fragment[@name eq $frag]/output/string(@name)[. ne '']
 };
 
+(: This interesting function creates a TEXT Template for the chosen Schema!!! :)
 declare
 %rest:GET
 %rest:path("/pekoe/schema/{$for}/text")
@@ -174,6 +204,15 @@ http://pekoe.io/bkfa/ad-booking/deliver-to/notes
 
 };
 
+declare function pekoe-schema:all-outputs($schema,$doctype) {
+    for $o in ($schema/output, $schema/fragment/output)
+    let $p := $o/..
+    let $type := if ($p instance of element(fragment)) then $p/@name/string() else $p/@path/string()
+    order by $type
+    return <tr><td>{$type}</td><td>{$o/@name/string()}</td></tr>
+
+};
+
 (:  ***************** This is the schema-paths page for a specific schema **************** :)
 declare function pekoe-schema:schema-page($schema,$doctype) {
    let $link-path := 'http://pekoe.io/' || $pekoe-schema:tenant 
@@ -212,8 +251,11 @@ declare function pekoe-schema:schema-page($schema,$doctype) {
            </thead>
            <tbody id='topt'>
                { pekoe-schema:make-paths($link-path, $schema) }
+               <tr><td style="font-weight: bold;" colspan='2'>Output functions</td></tr>
+               { pekoe-schema:all-outputs($schema, $doctype) }
                </tbody>
            </table>
+           <hr/>
            <div>
 {
 

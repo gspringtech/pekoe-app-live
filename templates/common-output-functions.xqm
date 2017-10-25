@@ -14,6 +14,19 @@ declare function pekoe:and-join($d) {
     string-join($d,' and ')
 };
 
+declare function pekoe:list-and-join($d) {
+    pekoe:list-and-join($d,', ',' and ')
+};
+
+declare function pekoe:list-and-join($d, $separator) {
+    string-join($d,$separator)
+};
+
+declare function pekoe:list-and-join($d,$list-separator,$last-separator) {
+    if (count($d) eq 1) then $d else 
+    string-join((string-join($d[position() ne last()],$list-separator),$d[position() eq last()]),$last-separator)
+};
+
 declare function pekoe:aust-short-date ($d) {
     if ($d castable as xs:date) then format-date($d,$pekoe:aust-short-date)
     else if ($d castable as xs:dateTime) then format-dateTime($d,$pekoe:aust-short-date) 

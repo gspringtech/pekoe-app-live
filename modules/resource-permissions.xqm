@@ -177,6 +177,7 @@ declare function rp:unlock-file($path) {
         let $res := rp:resource-permissions($path)
         let $owner := $res?col-owner
         let $group := $res?col-group
+        let $log := util:log('info','          ---------<< USER '  || $res?username || ' RELEASED ' || $uri)
         return util:exclusive-lock($doc, rp:really-unlock-file($uri, $owner, $group))
 };
 

@@ -55,8 +55,18 @@ declare function local:clean-value($node) {
 };
 
 declare function local:to($node) {
-    if (empty($node) or $node eq '') then <to>dba@pekoe.io</to>
-    else element {name($node)} {$node/normalize-space(text())}
+    if (empty($node) or $node eq '') then <to>dba@pekoe.io</to> (: effectively reports an error :)
+    else if (contains($node,',')) then 
+        for $to in tokenize($node, ',')
+        return <to>{normalize-space($to)}</to>
+    else <to>{$node/normalize-space(text())}</to>
+};
+
+declare function local:cc($node) {
+    if (contains($node,',')) then 
+        for $to in tokenize($node, ',')
+        return <cc>{normalize-space($to)}</cc>
+    else <cc>{$node/normalize-space(text())}</cc>
 };
 
 (: IIRC this helps overcome the ProxyNode issue when a mail message is stored in a file. :)
@@ -71,7 +81,7 @@ declare function local:to($node) {
         case element(attachment) return local:attachment($node)
         case element(to) return local:to($node)
         case element(from) return local:clean-value($node)
-        case element(cc) return  local:clean-value($node)
+        case element(cc) return  local:cc($node)
         case element(subject) return local:clean-value($node)
 (:        case element(xhtml) return <xhtml>{util:string-to-binary(util:serialize($node/*, 'method=xml'))}</xhtml>:)
         case $node as element()
@@ -112,21 +122,8 @@ let $props := <properties>
         
     let $session := mail:get-mail-session($props)
     (:let $message := util:deep-copy(doc($job)/mail)  KEEP THIS - It's useful to remember. :)
-    (: Somehow need to add attachments. An attachment is expected to be base64binary:
-    <attachment filename='' mimetype=''>base64binary</attachment>
-    So - 
-    :)
     let $m := local:dispatch($message)
-    (:let $stored := xmldb:store('/db/temp','prepared.xml',$m) :)
-    
-    (:let $mail := doc('/db/temp/prepared.xml')/mail:)
-    (:let $message := util:deep-copy($mail):)
-    (:let $m := local:dispatch($message) (\:  A message in a file is fine with spaces as long as it doesn't have an empty element :\):)
-    (:let $m := $message:)
-    (:let $log := util:log('warn',$m):)
 (:    let $save-prepared := xmldb:store('/db/temp','prepared-mail.xml',$m   ):)
-    
-    
     let $log := util:log-app('info','login.pekoe.io', '%%%%%%%%% ABOUT TO SEND MAIL FROM ' || $message/from || ' TO ' || $message/to || ' %%%%%%%%%%%%%% ')
     let $send :=  try { mail:send-email(xs:long($session), $m) } catch * { util:log("error", concat($err:code, ": ", $err:description)), <result status='error'>{$err:description}</result>    }
     
@@ -139,12 +136,11 @@ let $props := <properties>
 (: This is called by the tenant's site-tools module :)
 
 let $job-bundle := request:get-attribute('job-bundle')  (: SET IN THE CONTROLLER - but this is the PATH, not the data file.:)
-(:let $log := util:log('info', '$$$ job path is ' || $job-bundle):)
-
 let $mail-map := request:get-attribute("mail-map") (: SHOULD contain keys mail and job. The job IS THE DOCUMENT, so document-uri WORKS. :)
-(:let $log := util:log('info', '$$$ job path is ' || document-uri($mail-map?job)):)
 let $mail := $mail-map?mail
 let $sent :=  local:send-email($mail)
+
+(: The remainder of the query is about keeping a record of the sent mail :)
 let $job := $mail-map?job
 let $template := substring-after($mail-map?template,"templates/")
 let $current-date := adjust-date-to-timezone(current-date(),())

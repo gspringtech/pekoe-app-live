@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site-commands>
+    <commands for="user">
+        <!-- Validation is either through Javascript or by calling a schematron with javascript.
+             I would like to improve this by making the schematron into a configuration-item in this site-commands file.    
+        -->
+        <command name="Create User" template-type="*" enable-when="clean"/>
+    </commands>
+    <commands for="enquiry">
+        <command name="Open folder" template-type="*" enable-when="always">
+            // only applies if job is stored in a folder.
+            $( document.activeElement ).blur();
+            $a = $(this);
+            // path /exist/pekoe-files/files/jobs/2016/04/RT-000090/data.xml
+            var filepath = self.options.file.getPath().split('/');            
+            filepath.pop(); // get rid of 'data.xml'
+            filepath.splice(0,3); // and /exist/pekoe-files
+            filepath.unshift(''); // prepend "" to produce...       
+            // filepath ["", "files", "jobs", "2016", "04", "RT-000090"]
+            var folderName = filepath[filepath.length-1]; // RT-000090
+            var t = {
+                path: filepath.join('/'), 
+                href: "/exist/pekoe-app/files.xql?collection=" + filepath.join('/'), 
+                type: "folder", 
+                title: folderName + "-folder"
+            }
+            //console.log("Convert file.getPath:", self.options.file.getPath(), "to filepath:", filepath, "to produce tab", t);
+            gs.openItem(t,true);
+        </command>
+        <command name="Convert to Transaction-type" template-type="none" enable-when="never">
+            // REPLACED by a field command-button on /enquiry/new-job-ref
+jQuery(document.activeElement).blur();
+var o = self.options;
+var tt;
+var oResult = gs.Pekoe.oEvaluator.evaluate('//transaction-type', gs.thedocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+if (oResult === null || oResult.singleNodeValue === null) {
+    alert("Missing transaction-type");
+} else if (oResult.singleNodeValue.textContent == "") {
+    alert("Please choose a Transaction-type");
+} else {
+    tt = oResult.singleNodeValue.textContent;
+    if (confirm("Convert this enquiry to " + tt)) {
+        //jQuery.get('/exist/pekoe-files/config/convert-to-job.xql?path=' + o.file.getPath(), function (d, status, jqXHR) {
+        jQuery.get('/exist/pekoe-files/config/new-job.xql?action=newFromEnquiry&amp;path=' + o.file.getPath(), function (d, status, jqXHR) {
+            var jobID = $(d).text();
+            
+            
+            /*
+            The awkward thing at this point is that I want to mark this Enquiry as 'Converted' and add a generated-job with the jobID
+            But because the job-file is in USE, the new-job query doesn't have permission to edit it.
+            Can that be fixed? It works elsewhere.
+            
+            OR - somehow CLOSE the Enquiry and THEN process - but I don't know how to do that.
+            */
+            
+            
+            
+            $.statusMessage('Created job ' + jobID);
+            var t = {
+                href: jqXHR.getResponseHeader('Location'), 
+                type: 'form', 
+                title: 'New ' +  tt
+            }
+            gs.openItem(t, true);
+        });
+    }
+}
+</command>
+       <!-- <command name="Download" template-type="*" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            var o = self.options;
+            if (o.template) {
+            var path = o.template + "?action=download&job=" + o.file.getPath();
+            jQuery.statusMessage("merge " +path);
+            window.location.href= "/exist/pekoe-files/merge" + path;
+            }
+        </command>-->
+    </commands>
+    <commands for="agency business land-division lease legal mortgage other public-trustee residential searches">
+<!--        <command name="Download" template-type="odt ods" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            var o = self.options;
+            if (o.template) {
+            var path = o.template + "?action=download&job=" + o.file.getPath();
+            jQuery.statusMessage("merge " +path);
+            window.location.href= "/exist/pekoe-files/merge" + path;
+            }
+        </command>
+        <command name="Save with job" template-type="odt ods" enable-when="never">
+            jQuery( document.activeElement ).blur();
+            var o = self.options;
+            if (o.template) {
+            var path = o.template + "?action=save-in-job-folder&job=" + o.file.getPath();
+            
+            jQuery.get("/exist/pekoe-files/merge" + path,function(d){$.statusMessage("Saved " + $(d).text());});
+            }
+        </command>-->
+        <xcommand name="Edit Letter" template-type="odt ods" enable-when="clean">
+             jQuery( document.activeElement ).blur();
+            var o = self.options;
+            if (o.template) {
+                var path = o.template + "?action=save-in-job-folder&amp;job=" + o.file.getPath();
+                // see config/site-tools.xqm
+                jQuery.get("/exist/pekoe-files/merge" + path ,function(d){
+                    var p = $(d).text();
+                    $.statusMessage("Saved " + p);
+                    console.log("received",p);
+                    // now, create a new Tab with a request for the file.
+                    // the new tab should open a File-Handler which I'm about to invent.
+                    //gs.openItem(t,true);
+                    location.href = "neo:https://cm.pekoe.io/exist/webdav" + p;
+                });
+            }
+        </xcommand>
+<!-- I tried using a jquery-ui dialog but it doesn't work.
+                        var $d = jQuery('<div></div>').text("File already exists");
+            jQuery('body').append($d);
+            
+            $d.dialog({
+               modal: true,
+               buttons: {
+                 "Replace" : function () {
+                   // something
+                   jQuery(this).dialog('close');
+                   $d.remove();
+                 },
+                 "New": function () {
+                    jQuery(this).dialog('close');
+                    $d.remove();
+                 },
+                 "Cancel" : function (){
+                   jQuery(this).dialog('close');
+                   $d.remove();
+                 }
+               }
+             }
+           );
+           -->
+        <command name="Create Letter" template-type="odt ods" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            // this should really be asking "File exists. Replace, New, Cancel"
+            // to do this I would need to know how to construct the path so I can ask if it exists
+            // jQuery.get("/exist/pekoe-app/Letter-opener.xql?file= and action=check-existing)
+            
+            var o = self.options;
+            if (o.template) {
+                var path = o.template + "?action=save-in-job-folder&amp;job=" + o.file.getPath();
+                // see config/site-tools.xqm
+                jQuery.get("/exist/pekoe-files/merge" + path ,function(d){
+                    var p = $(d).text();
+                    var title = p.split('/').pop();
+                    $.statusMessage("Saved " + p);
+                    console.log("received",p);
+                    // now, create a new Tab with a request for the file.                    
+                     var t = {
+                          path: p, 
+                          //href: "/exist/pekoe-app/Letter-opener.xql?file=neo:https://owl.fritz.box/exist/webdav" + p,
+                          href: "/exist/pekoe-app/Letter-opener.xql?file=" + p,
+                          type: "report", 
+                          title: title
+                      }
+                    gs.openItem(t,true);
+                }).fail(function(d) {
+                     alert( "Error - Maybe the letter is Locked?");
+                   });
+            }
+        </command>
+        <!-- 
+            It might be worth looking at the idea of a pop-up button.
+            $.get('file-list', function(d) {
+                d.split(??).map(<div tab info class=.pekoe-tab>file name here</div>
+                // see pekoe-form/index for .pekoe-tab handler
+                pop this up in a list? 
+            });
+            
+            Open Folder - either HIDE it if there's no Job folder not(@bundled eq 1)
+            or make it CREATE a Bundle (after confirmation)?
+            OR replace with Create Job Folder (but not sure how)
+        -->
+        <command name="Open folder" template-type="*" enable-when="always">
+            // only applies if job is stored in a folder.
+            $( document.activeElement ).blur();
+            $a = $(this);
+            // path /exist/pekoe-files/files/jobs/2016/04/RT-000090/data.xml
+            var filepath = self.options.file.getPath().split('/');            
+            filepath.pop(); // get rid of 'data.xml'
+            filepath.splice(0,3); // and /exist/pekoe-files
+            filepath.unshift(''); // prepend "" to produce...       
+            // filepath ["", "files", "jobs", "2016", "04", "RT-000090"]
+            var folderName = filepath[filepath.length-1]; // RT-000090
+            var t = {
+                path: filepath.join('/'), 
+                href: "/exist/pekoe-app/files.xql?collection=" + filepath.join('/'), 
+                type: "folder", 
+                title: folderName + "-folder"
+            }
+            //console.log("Convert file.getPath:", self.options.file.getPath(), "to filepath:", filepath, "to produce tab", t);
+            gs.openItem(t,true);
+        </command>
+    </commands>
+    <commands for="report">
+        <command name="Run report" action="run" description="Evaluate this report" template-type="xml" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            // check for dirty now??
+            var o = self.options;
+            if (o.template) {
+            var path = "xql:/db/pekoe-system/report-maker.xql?action=blah&amp;job=" + o.file.getPath();
+            //jQuery.statusMessage("Creating report " +path);
+            //jQuery.get(path);
+            // new TAB with form
+            console.log('want a new tab for path:', path);
+            gs.Pekoe.newTab("Report", path, "list");
+
+            }
+        </command>
+    </commands>
+    <xcommands for="mail-test">
+        <command name="Send email" action="email" description="Send directly to named-recipient" template-type="mailx" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            var o = self.options;
+            var params = {};
+            params.action = "email";
+            params.job = o.file.getPath();
+            
+            if (o.template) {
+            var path = o.template;
+            jQuery.statusMessage("Generate an email for " +path);
+            jQuery.get("/exist/pekoe-files/xmail" + path, params).fail(function(d){$.statusMessage($(d).text())});
+            }
+        </command>
+    </xcommands>
+    <commands for="residential">
+<!--        <command template-type="odt" name="Download" action="download" description="Download to edit. For print or custom email." enable-when="clean">
+        jQuery( document.activeElement ).blur();
+        var o = self.options;
+        if (o.template) {
+            var path = o.template + "?action=download&job=" + o.file.getPath();
+            jQuery.statusMessage("merge " +path);
+            window.location.href= "/exist/pekoe-files/merge" + path;
+        }
+        </command>-->
+        <command name="Send email" action="email" description="Send directly to named-recipient" template-type="mailx" enable-when="clean">
+            jQuery( document.activeElement ).blur();
+            var o = self.options;
+            var params = {};
+            params.action = "email";
+            params.job = o.file.getPath();
+            
+            if (o.template) {
+            var path = o.template;
+            jQuery.statusMessage("Generate an email for " +path);
+            jQuery.get("/exist/pekoe-files/xmail" + path, params).fail(function(d){$.statusMessage($(d).text())});
+            }
+        </command>
+    </commands>
+</site-commands>

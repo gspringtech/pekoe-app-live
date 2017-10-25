@@ -94,11 +94,40 @@ declare variable $textx:stylesheet := <xsl:stylesheet xmlns:xsl="http://www.w3.o
             </xsl:choose>
     </xsl:template>
 
-    <xsl:template match="a">        
-        <xsl:variable name="href" select="@href" />         
-        <xsl:value-of select="$phlinks/link[@original-href eq $href]/normalize-space(string(.))" />
-    </xsl:template>
+<!-- 
+I'd like to be able to match the whitespace used in repeating lines:
+    {{address-lines}}
+    currently produces... (only the first line is indented)
+    
+    29 Chasewater Street
+Lower Mitcham
+SA 5062
+_________
 
+To fix this, I would need to copy the line. But by the time I get to this <a href='field-path'>...
+I have already output the indent text.
+
+One option is to use a different kind of placeholder, (not an anchor)
+Or to put special markup into the text - perhaps an empty placeholder {{    }} 
+   containing the whitespace or other formatting - perhaps a tab or " - ".
+   
+But this would need to wrap the whole line. Perhaps it is a {{REPEAT - {{address-lines}}}}
+The stylesheet could go into a MODE where the marked text is copied - but that would be hard .
+Perhaps the ANCHOR could contain the whitespace and/or text.
+Or perhaps the output function should deal with it. (this is the worst idea)
+
+
+--> 
+    <xsl:template match="a">        
+        <xsl:variable name="href" select="@href" />      
+        <xsl:variable name="text" select="$phlinks/link[@original-href eq $href]" />
+        <xsl:apply-templates select="if ($text/line) then $text/line else $text" />
+    </xsl:template>
+<!-- <xsl:value-of select="$phlinks/link[@original-href eq $href]" /> -->
+<xsl:template match="line">
+<xsl:value-of select='.'/><xsl:text>&#xa0;
+</xsl:text>
+</xsl:template>
 
 
 </xsl:stylesheet>

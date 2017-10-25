@@ -10,7 +10,8 @@ declare option output:method "html5";
 declare option output:media-type "text/html";
 
 declare variable $local:collection-path := $tenant:tenant-path || "/files";
-declare variable $local:items := (collection($local:collection-path)/documentation, collection('/db/pekoe/common/resources/documentation')/documentation);
+(:  Help should not pick up MY db-documentation. only the tenants in their resources folder. :)
+declare variable $local:items := (collection($local:collection-path || '/resources/documentation')/documentation, collection('/db/pekoe/common/resources/documentation')/documentation);
 
 declare variable $local:doctype := "documentation";
 

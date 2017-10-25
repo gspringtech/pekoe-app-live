@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
     <xd:doc scope="stylesheet">
         <xd:desc>
             <xd:p>
@@ -11,7 +11,7 @@
     </xd:doc>
     <xsl:variable name="match">\{\{([^}]+)\}\}</xsl:variable>
     <xsl:variable name="root" select="/"/>
-    <xsl:key name="links" match="link" use="string(placeholder)"/>
+    <xsl:key name="links" match="link" use="string(id)"/>
     <xsl:template match="node() | @*">
         <xsl:copy>
             <xsl:apply-templates select="node() | @*"/>
@@ -25,8 +25,25 @@
     the path for these is found in the template links.
     
     Replace these placeholders with standard hyperlinks which can be more easily processed.
+    The text-template is the context here. It's really an XML document:
+<text created-dateTime="2017-05-22T17:06:07.432+09:30" created-by="admin" ed
+ited="2017-05-22T07:37:24.863Z">
+    <content>
+
+The shipping address we have on record for {{organisation-name}} is:
+
+      {{shipping-contact-address}}
+
+
+</content>
+    <doctype>annual-grant-distribution</doctype>
+    <link>
+        <id>shipping-contact-address</id>
+        <path>http://pekoe.io/bkfa/annual-grant-distribution/contact-person?o=shipping-contact&o=on-separate-lines</path>
+    </link>
+</text>
     -->
-    <xsl:template match="link"/> <!-- delete the links from the output -->
+    <xsl:template match="link"/> <!-- delete the LINKs from the output -->
     <xsl:template match="content/text()[contains(.,'{{')]">
         <xsl:analyze-string select="." regex="{$match}">
             <xsl:matching-substring>

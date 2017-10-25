@@ -1,4 +1,4 @@
-xquery version "3.0";
+xquery version "3.1";
 (: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 (: *************** SetUID is applied. *************** SetUID is applied. *************** SetUID is applied. :)
 (: 
@@ -12,10 +12,7 @@ xquery version "3.0";
     
     Why can't UNLOCK be performed the same way?
     
-    
 :)
-
-
 
 
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
@@ -23,7 +20,8 @@ declare option output:method "html5";
 declare option output:media-type "text/html";
 
 import module namespace rp = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
-
+import module namespace s3="http://pekoe.io/s3"; (: upload and download from AWS S3 :)
+import module namespace ps3="http://pekoe.io/pekoe-s3" at "modules/s3-toc.xqm"; (: manage the config and table-of-contents (TOC) for AWS S3 :)
 
 declare variable $local:root-collection := "/db/pekoe";
 declare variable $local:base-collection := "/files";
@@ -52,7 +50,6 @@ declare variable $local:user-is-admin-for-tenant := local:user-is-admin-for-tena
 :)
  
 
-
 (:
     Display the contents of a collection in a table view.
 :)
@@ -78,16 +75,94 @@ declare function local:get-parent-collection($path as xs:string) as xs:string {
         replace($path, "/[^/]*$", "")
 };
 
+(: ***************************************   Pekoe-S3 - AWS S3 FILE UPLOAD ***********************************  :)
+
+(: When an S3 upload completes successfully, store the file-data in a TOC. This is called by an Ajax request in Files.xql :)
+declare function local:s3-register-file() {
+    let $s3-config := ps3:config($local:tenant-path)   
+    (: **** See modules/s3-toc.xqm for the structure of the file Spec.  **** :)
+    (: The fileSpec is constructed as an object in the Javascript, then stringified before being posted here   :)
+    let $fileSpec := parse-json(request:get-parameter("fileSpec",()))
+    let $toc := doc(ps3:create-toc($local:tenant-path || $fileSpec?collection, $ps3:default-toc-name))/s3:toc
+    
+    (: Add the missing pieces: toc, config, user   :)
+    let $fullSpec := map:new(($fileSpec, map{'toc': $toc, 'config': $s3-config, 'user':$local:current-user//sm:username/string() }))
+    let $s3-file := ps3:create-file($fullSpec)
+    let $update := ps3:update-toc($toc, $s3-file)
+    return local:redirect-to-browse("", "", "User " || $fullSpec?user || " uploaded " || $fullSpec?key || " to S3 " || $fullSpec?bucket)
+
+};
+
+declare function local:move-all-to-s3() {
+    let $safe-collection := request:get-parameter("path", ())
+    let $s3-config := ps3:config($local:tenant-path)
+    let $collection := util:collection-name($local:tenant-path || $safe-collection)
+    let $uploaded := for $f in  ps3:upload-binaries-from-collection($s3-config, $local:tenant-path, $collection) return util:log-app('warn','pekoe.io',$local:current-user/sm:username/string() || ' Uploaded to S3 ' || $f) 
+    (: Permissions not working here   :)
+    let $s3-toc := doc($collection || "/" || $ps3:default-toc-name)/s3:toc
+    let $deleted := 
+        for $f in $s3-toc/s3:file
+            let $is-available := util:binary-doc-available($collection || '/' || $f/string())
+            let $remove := 
+                if ($is-available) then (
+(:                    util:log('warn', 'going to delete file ' || $f) ):)
+                                    xmldb:remove($collection, $f/string()))
+                                    
+            else (util:log('warn',"CAN'T DELETE UPLOADED FILE " || $f))
+            return (util:log('warn','Deleting ' || $f || ' after upload to s3'))
+    return local:redirect-to-browse($safe-collection, 'browse', $local:current-user/sm:username/string() || ' UPLOADED FILES TO S3 FROM ' || $collection)
+};
+
+(: get a file back from s3 and store in this collection:)
+declare function local:retrieve-from-s3() {
+    let $path := request:get-parameter("path","")
+    let $safe-collection := request:get-parameter("path", ())
+    let $s3-config := ps3:config($local:tenant-path)
+    let $collection := util:collection-name($local:tenant-path || $safe-collection)
+    let $parent-collection := util:collection-name($path)
+    let $quarantined := local:quarantined-path($parent-collection)
+    
+    return local:redirect-to-browse($quarantined, 'browse', $local:current-user/sm:username/string() || ' RETRIEVED FROM S3' || $path)
+};
+
+declare function local:mark-as-deleted($path) {
+    (:<s3:toc xmlns:s3="http://pekoe.io/s3" created-dateTime="2017-06-05T11:18:49.363+09:30" created-by="admin">
+    <s3:file key="files/test-jobs/Res-test/Cheque-request-BankSA.ods" user="admin" created-date="2017-06-02T10:29:30.000+09:30" modified-date="2017-06-02T10:29:30.000+09:30" size="108148" etag="908bda83ef56a2c2831223ac90c9f958&#34;" mime-type="application/vnd.oasis.opendocument.spreadsheet" bucket="cmpekoe" region="ap-southeast-2">Cheque-request-BankSA.ods</s3:file>
+</s3:toc>
+
+    path is s3://files/test-jobs/Res-test/Cheque-request-BankSA.ods"
+    so s3:file should be 
+    let $key := substring-after($path, "s3://")
+    let $quarantined-collection := string-join(tokenize($key,"/")[position() ne last()],'/')
+    
+    and thus collection($local:tenant-path || '/' || string-join(tokenize(substring-after($path, "s3:/"),"/")[position() ne last()],'/'))//s3:file[@key eq 
+:)
+    let $key := substring-after($path, "s3://")
+    let $quarantined-collection := string-join(tokenize($key,"/")[position() ne last()],'/')
+    let $file := collection($local:tenant-path || '/' || $quarantined-collection)//s3:file[@key eq $key]
+    let $replacement := element s3:deleted {
+                                           $file/@*,
+                                           attribute deleted-by {$local:current-user/sm:username/string()},
+                                           attribute deleted-date {adjust-dateTime-to-timezone(current-dateTime(),())},
+                                           $file/string()
+                                       }
+    let $mark-deleted := update replace $file with $replacement
+    
+    return $quarantined-collection
+}; 
+
 (: ***************************************     FILE UPLOAD ***********************************  :)
 declare function local:file-upload() {
     let $safe-collection := request:get-parameter("collection", ())
     let $collection := $local:tenant-path || $safe-collection
-    let $name := request:get-uploaded-file-name("fname")
+    let $name := replace(request:get-uploaded-file-name("fname"),'\C|:','_') (: replace \C "A character that cannot be part of an XML name" :)
     let $file := request:get-uploaded-file-data("fname")
     let $log := util:log("debug", "GOING TO STORE " || $name || " INTO COLLECTION " || $collection)
     let $stored := xmldb:store($collection, xmldb:encode-uri($name), $file)
     let $permissions := rp:set-default-permissions($stored)
-    return local:redirect-to-browse($safe-collection, 'browse','UPLOADED FILE ' || $name) (:response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection)):)
+    return local:redirect-to-browse($safe-collection, 'browse',$local:current-user/sm:username/string() || ' UPLOADED FILE ' || $name || ' TO ' || $safe-collection) 
+    
+    (:response:redirect-to(xs:anyURI(request:get-url() || '?collection=' || $safe-collection)):)
 };
 
 declare function local:file-upload-to-job() {
@@ -217,6 +292,10 @@ declare function local:do-trash() {
     let $path := request:get-parameter("path","")
     return if ($path eq $local:base-collection) 
     then (response:set-status-code(304),response:set-header("Location", request:get-url()))
+    else if (starts-with($path, "s3:")) then 
+        let $quarantined := local:mark-as-deleted($path)
+        let $log := util:log("warn", "attempt to delete s3 " || $path)
+        return local:redirect-to-browse($quarantined,'browse', $path)
     else
     let $trash-can := xmldb:create-collection($local:tenant-path, "trash")
 (:  A USER CAN DELETE AN ADMIN FILE - WHY??? WHERE ARE THE CHECKS?   :)
@@ -338,7 +417,7 @@ declare function local:do-new() {
     let $full-path := $local:tenant-path || $path
     let $item-type := request:get-parameter("doctype","") 
     let $fn := request:get-parameter("file-name","")
-    let $file-name := local:good-file-name($fn,$item-type)
+    let $file-name := if ($item-type eq 's3:toc') then 'S3-TOC.xml' else local:good-file-name($fn,$item-type)
     let $permissions := rp:collection-permissions($full-path)
     
     return if ($item-type eq '') then local:redirect-to-browse($path,"browse","missing item-type")
@@ -444,15 +523,19 @@ declare function local:do-rename(){
         
 (:        try {:)
     (: NO default action :)
-         if ($local:action eq "unlock") then local:unlock-file()
-    else if ($local:action eq "upload") then local:file-upload()
-    else if ($local:action eq "upload-to-job") then local:file-upload-to-job()
-    else if ($local:action eq "create")    then local:do-new()
-    else if ($local:action eq "delete") then local:do-trash()
-    else if ($local:action eq "move")   then local:do-move()
-    else if ($local:action eq "move-up") then local:do-move-up()
-    else if ($local:action eq "rename") then local:do-rename()
-    else if ($local:action eq "data") then local:do-data()
+         if ($local:action eq "unlock")         then local:unlock-file()
+    else if ($local:action eq "upload")         then local:file-upload()
+    else if ($local:action eq "upload-to-job")  then local:file-upload-to-job()
+    else if ($local:action eq "s3-success")     then local:s3-register-file()
+    else if ($local:action eq "all-to-s3")      then local:move-all-to-s3()
+    else if ($local:action eq "retrieve-from-s3")      then local:retrieve-from-s3()
+    else if ($local:action eq "create")         then local:do-new()
+    else if ($local:action eq "delete")         then local:do-trash()
+    else if ($local:action eq "move")           then local:do-move()
+    else if ($local:action eq "move-up")        then local:do-move-up()
+    
+    else if ($local:action eq "rename")         then local:do-rename()
+    else if ($local:action eq "data")           then local:do-data()
     else <result status='error'>Unknown action {$local:action} </result>
     
 (:    } catch * { "CAUGHT ERROR " || $err:code || ": " || $err:description || " " || $local:action }:)

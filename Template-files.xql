@@ -68,7 +68,11 @@ declare variable $local:workspace-type := map {
     'report'        : 'report'
 };
 
-declare variable $local:editor-link-protocol := map {'odt' : 'neo', 'ods' : 'neo'};
+declare variable $local:editor-link-protocol := map {
+    'odt' : '/exist/pekoe-app/Letter-opener.xql?file=', 
+    'ods' : '/exist/pekoe-app/Letter-opener.xql?file=', 
+    'docx' : '/exist/pekoe-app/Letter-opener.xql?file=',
+    'eml':'message://'};
 
 declare function local:filtered-items() {
     for $c in ($local:all-items)
@@ -282,17 +286,13 @@ var t = {
 declare function local:format-binary($common, $item) {    
     let $path := $local:collection-path || '/' || $item
     let $safe-path := $local:current-collection || '/' || $item
-    let $short-name := substring-before($item,'.')
+    let $short-name := tokenize($item, '\.')[1] 
+(:    substring-before($item,'.'):)
     let $smp := sm:get-permissions(xs:anyURI($path))/sm:permission
     let $extension := substring-after($item, '.')
-    
-    
     (:  +++ How do I change this so that ODT and ODS (initially) cause a File-handler to run? +++++   :)
-    let $edit-link := 
-(:    if (false()):)
-            if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) 
-        (:  THIS IS REALLY WRONG!!! THIS WILL ALWAYS OPEN THE ReAL File          :)
-        then "/exist/pekoe-app/Letter-opener.xql?file=" || $local:editor-link-protocol($extension) || ":" || $lw:server || "/exist/webdav" || $path 
+    let $edit-link := if ($local:editor-link-protocol($extension) and sm:has-access(xs:anyURI($path), 'rw')) 
+        then $local:editor-link-protocol($extension) ||  $path 
         else '/exist/pekoe-files' || $safe-path
         
     let $attributes := map { 
@@ -308,18 +308,14 @@ declare function local:format-binary($common, $item) {
     'path' : $path, 
     'attributes' : $attributes,
     'quarantined-path' : tenant:quarantined-path($path),
-    'name' : substring-before($item,'.'),
+    'name' : $short-name,
     'type' : $extension,
     'permissions' : $smp/@mode/string(),
     'owner'   : $smp/@owner/string(),
     'group' : $smp/@group/string(),
     'icon' : $local:type-icon($extension),
     'created' : format-dateTime(xmldb:created($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
-    'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]"),
-    'admin-link' :  if ($extension eq 'docx') 
-                    then <a>{attribute href { "ms-word:ofe|u|" || $lw:server || "/exist/webdav" || $path }}{$item}</a> 
-(:                    else (<a>{attribute href { "/exist/pekoe-app/Letter-opener.xql?file=neo:https://" || $tenant:tenant || ".pekoe.io/exist/webdav" || $path }}{$item}</a> ):)
-                    else (<a>{attribute href { $lw:server || "/exist/webdav" || $path }}{$item}</a> )
+    'modified' : format-dateTime(xmldb:last-modified($local:collection-path, $item),"[D01] [M01] [Y0001] [H01]:[m01]:[s01]")
     }
 };
 
@@ -398,15 +394,7 @@ declare function local:value-or-input($field, $action, $path) {
 };
 
 (:  ----------------------------------------------------   MAIN QUERY ---------------------------------------- :)
-(:let $server-log := util:log('info','SERVER: request:get-effective-uri() ' || request:get-effective-uri())
-let $sl2 := util:log('info','SERVER: request:get-context-path() ' || request:get-context-path())
-let $sl3 := util:log('info','SERVER: request:get-hostname() ' || request:get-hostname())
-let $sl3 := util:log('info','SERVER: request:get-scheme() ' || request:get-scheme()):)
-(: These are good... :)
-let $sl3 := util:log('info','SERVER: request:get-server-name() ' || request:get-server-name()) (: cm.pekoe.io :)
-let $sl3 := util:log('info','SERVER: request:get-uri() ' || request:get-uri()) (: /exist/pekoe-app/Template-files.xql  xxx NOT /exist/rest/db/apps/pekoe/Template-files.xql xxx :)
-let $sl3 := util:log('info','SERVER: request:get-url() ' || request:get-url()) (: http://cm.pekoe.io/exist/pekoe-app/Template-files.xql :)
-let $sl4 := util:log('info','SERVER HEADERS ' || string-join(request:get-header-names(),' '))
+
 let $conf := map {
     'doctype' : function ($item) { 'unknown' },
     'display-title' : function ($item) { $item }
@@ -425,7 +413,7 @@ let $content :=  map:new(($default-content,  map {
     'column-headings': 
         switch ($local:view)
         case 'supplies' return ['AD-Date','Org','Kits', 'Paid?', 'Invoice-number', 'Latest Note']
-        default return ['Name','Permissions','Editors','Viewers','Created','Modified', if (sm:is-dba(xmldb:get-current-user())) then 'admin-link' else '&#160;']
+        default return ['Name','Permissions','Editors','Viewers','Created','Modified']
     ,
     'doctype' : '',
     'row-function' : function ($item) { (: Used to generate the row-data map for each item:)
@@ -433,13 +421,15 @@ let $content :=  map:new(($default-content,  map {
         let $common := local:common-features($item)
         return 
         switch (substring-after($item,'.'))
-        case '' return local:format-collection($common, $item)
+        (:  WRONG - this doesn't handle files with NO EXTENSION.      ************************************************* :)
+(:        case '' return if (xmldb:collection-available(util:collection-name($item))) then local:format-collection($common, $item) else local:format-binary($common, $item):)
+        case '' return  local:format-collection($common, $item) 
         case 'xml' return local:format-xml($common, $item)
         case 'xql' return local:format-query($common, $item)
         default return local:format-binary($common, $item)        
     },
     'row-attributes' : function ($item, $row-data) {
-        (: Attributes is now a map        :)
+        (: Attributes is now a map. This returns a sequence of html attributes to be added to the TR. In this case, the functions above are producing a map of attributes.  :)
         map:for-each-entry($row-data?attributes, function ($k, $v) {
             attribute {$k} {$v}
         })
@@ -483,7 +473,11 @@ let $content :=  map:new(($default-content,  map {
         <script>
         // <![CDATA[
         $(function () {
-            // See AD-Bookings for an example. 
+            // See AD-Bookings for an example.
+            $('#rename-file').on('click',function () {
+                console.log('active is ',$('.active'));
+                return false;
+            });
         });
         // ]]>
         </script>
@@ -506,10 +500,15 @@ let $content :=  map:new(($default-content,  map {
     $up.attr('disabled','disabled');
     $('#fname1').on('change', function () {
         if ($(this).val() !== '') {
-            var reCheck;
+            var reCheck = /.+\.(pdf|odt|ods|docx|txt|zip|eml)$/;
             // only allow .docx .txt, .odt .pdf 
             // check the name for bad chars
-            $up.removeAttr('disabled');
+            if ($(this).val().search(reCheck) !== -1) {
+                $up.removeAttr('disabled');
+            } else {
+                alert('File must be a docx, .odt, .ods, .pdf or .txt')
+                $up.attr('disabled','disabled');
+            }
         } else {
             $up.attr('disabled','disabled');
         }
@@ -549,7 +548,7 @@ let $content :=  map:new(($default-content,  map {
     'items' :  switch ($lw:action) 
                 case "list" return local:filtered-items() (: Items are filtered to avoid permission errors.:)
                 (:  The searches return nodes. But this List needs a path. :)
-                case "Search" return for $n in collection($local:collection-path)/*[contains(., request:get-parameter('search',''))]    return substring-after(base-uri($n), $local:collection-path)
+                case "Search" return for $n in collection($local:collection-path)/*[matches(., request:get-parameter('search',''),'i')]    return substring-after(base-uri($n), $local:collection-path)
                 case "xpath"  return for $n in lw:xpath-search()                                                                        return substring-after(base-uri($n), $local:collection-path)
                 default return local:filtered-items()
                 

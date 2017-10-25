@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- (: Copyright 2012 Geordie Springfield Pty Ltd Australia :) -->
-<xsl:stylesheet xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xd="http://www.oxygenxml.com/ns/doc/xsl" xmlns:xs="http://www.w3.org/2001/XMLSchema" exclude-result-prefixes="xs xd" version="2.0">
     
     <!-- 
             Output functions - discussion: 
@@ -67,8 +67,10 @@
     <xsl:param name="tenant" required="yes"/>
     <xsl:param name="template-meta-path" required="yes"/>
     <xsl:variable name="schema-type" select="/links/string(@for)"/> <!-- e.g. "schools", "school-booking", "properties", "schema" -->
-    <xsl:variable name="doctype" select="/links/string(@template-type)"/> <!--  "docx", "html" or "txt" -->
+    <xsl:variable name="template-doctype" select="/links/string(@template-type)"/> <!--  "docx", "html" or "txt" -->
+    <xsl:variable name="doctype" select="if ($template-doctype eq 'text') then 'textx' else $template-doctype"/>
     <xsl:variable name="doctype-module" select="concat('merge-',$doctype)"/> <!-- pekoe-docx - to distinguish it from other things.-->
+    <xsl:variable name="extras-module" select="concat($path-to-schema-col, '/',$schema-type,'-extras.xqm')"/>
     <xsl:template match="/">
 (: 
    This is a Pekoe Merge XQuery for the Template <xsl:value-of select="$template-file"/>
@@ -90,15 +92,16 @@ import module namespace pekoe="http://www.gspring.com.au/pekoe/output-functions"
 <!-- The Schema module containing the output functions -->
         <!-- will need to change the namespace to make it tenant-specific -->
 import module namespace <xsl:value-of select="$schema-type"/>="http://www.gspring.com.au/schema-module/<xsl:value-of select="$schema-type"/>" 
-        at "xmldb:exist://<xsl:value-of select="$path-to-schema-col"/>/<xsl:value-of select="$schema-type"/>.xqm";
+        at "<xsl:value-of select="$path-to-schema-col"/>/<xsl:value-of select="$schema-type"/>.xqm"<xsl:if test="doc-available($extras-module)">,
+           "<xsl:value-of select="$path-to-schema-col"/>/<xsl:value-of select="$schema-type"/>-extras.xqm"</xsl:if>;
 <!-- the doctype module -->
 import module namespace <xsl:value-of select="$doctype-module"/>="http://www.gspring.com.au/pekoe/merge/<xsl:value-of select="$doctype"/>" 
-        at "xmldb:exist:///db/apps/pekoe/templates/<xsl:value-of select="$doctype-module"/>.xqm";
+        at "/db/apps/pekoe/templates/<xsl:value-of select="$doctype-module"/>.xqm";
 <!-- the site-specific module - per tenant -->
 import module namespace site="http://gspring.com.au/pekoe/site-tools" 
         at "/db/pekoe/tenants/<xsl:value-of select="$tenant"/>/config/site-tools.xqm";
-        
-        
+<!-- allow for an optional extras module -->        
+                
     
 declare copy-namespaces preserve, inherit; 
     
