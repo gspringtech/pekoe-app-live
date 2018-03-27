@@ -4,6 +4,7 @@ xquery version "3.1";
 import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/apps/pekoe/modules/tenant.xqm";
 import module namespace pqt="http://gspring.com.au/pekoe/querytools" at "xmldb:exist:///db/apps/pekoe/modules/querytools.xqm";
 import module namespace rp = "http://pekoe.io/resource-permissions" at "modules/resource-permissions.xqm";
+import module namespace odf-repair = "http://pekoe.io/odf-repair" at "templates/repair-odf.xqm";
 
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare option output:method "html5";
@@ -12,6 +13,8 @@ declare option output:media-type "text/html";
 declare variable $local:action := request:get-parameter("action", "capture");
 declare variable $local:file := request:get-parameter("file","");
 declare variable $local:path := substring-after($local:file, "exist/webdav"); (: Being really lazy here. MUST FIX THESE PATHS :)
+declare variable $local:fix-date := xs:dateTime("2018-01-06T12:00:00"); (: date and time the repair code was installed :)
+
 (:declare variable $local:collection-path := $tenant:tenant-path || "/files";:)
 
 (: The aim here is to display a Pekoe Tab and open the requested file in the Word Processor. 
@@ -82,6 +85,22 @@ declare function local:release-file() {
        Finally, the big "Close" button is going to send a "release" request to this page.
     :)
     
+declare function local:check-and-repair() {
+    let $col := util:collection-name($local:file)
+    let $d := util:document-name($local:file)
+    let $created := xmldb:created($col,$d)
+    let $modified := xmldb:last-modified($col,$d)
+    return 
+    (:
+        if created before $repair-fix-date AND not modified SINCE $repair-fix-date, then possibly corrupt.
+        if created eq modified (prior to repair
+    :)
+    if ($created gt $local:fix-date) then () (: it should be fine :)
+    else if ($modified gt $local:fix-date) then () (: again, should be fine :)
+    else if ($created eq $modified) then odf-repair:repair-odf($local:file) (: created before the fix, and NOT modified - FIX IT :)
+    else "possibly-corrupt" (: So show a "Repair" button :)
+    
+};
     
     
 (: --------------------- Main Query wrapped in HTML -------------------------------------------------:)
@@ -107,13 +126,19 @@ function openFile() {
     var opener = "";
     var experimentalOpener = "";
     switch (p) {
+        case "Win64.odt" :
+        case "Win64.ods" :
         case "Win32.odt" : 
         case "Win32.ods" : opener = "vnd.sun.star.webdavs://" + location.host + "/exist/webdav" +args.file; break;
+        case "Win64.docx" :
         case "Win32.docx": opener = "ms-word:ofe|u|https://" + location.host + "/exist/webdav" +args.file; break;
+        case "Win64.xslx" :
         case "Win32.xslx" : opener = "ms-excel:ofe|u|https://" + location.host + "/exist/webdav" + args.file; break;
+        case "Linux x86_64.odt" :
+        case "Linux x86_64.ods" : experimentalOpener =  "vnd.sun.star.webdavs://" + location.host + "/exist/webdav" +args.file; opener = "vnd.sun.star.webdavs://" + location.host + "/exist/webdav" +args.file; break;
         case "MacIntel.ods" : 
         case "MacIntel.odt" :  
-                experimentalOpener = "vnd.sun.star.webdavs://" + location.host + "/exist/webdav" +args.file;
+                experimentalOpener =  "vnd.sun.star.webdavs://" + location.host + "/exist/webdav" +args.file;
                 opener = "neo:https://"  + location.host + "/exist/webdav" +args.file;  break;
         case "MacIntel.docx" : opener = "https://" + location.host + "/exist/rest" +args.file; break;
         default : alert("Unknown platform and/or file-type: " + p);
@@ -167,8 +192,19 @@ $(function() {
 		});
 		
     });
-    openFile();
-    //console.log('gs.service',gs.scope);
+
+
+    $('#repair').on('click', function () {
+        console.log('repair file ' + args.file);
+        $.get("/exist/pekoe-app/templates/repair-odf.xql", {"odf":args.file}, function (d, ts) {
+            if (d == args.file) { location.reload(); } 
+            else { console.log("got d",d); }
+        });
+    });
+    
+        openFile();
+    // set an interval timer to check the document. If it has closed, close the file and finish
+   // startTimer();
 });
 //]]>
 </script>
@@ -177,13 +213,21 @@ $(function() {
 {
 (
     local:capture-file(),
+    let $repaired := local:check-and-repair()
+    return
 (:    util:log('warn', '000000000 Letter-opener received capture request for file ' || request:get-parameter('file','')),:)
 <div id='content'>
-<h1>Remember to close the file</h1>
-<p>Close the file in your word processor and then click this close button..</p>
-<p style="text-align:center; font-size: larger"><button id='close'>Close</button></p>
-<div>Click <a href='javascript:openFile();'>here</a> to open it again</div>
+    <h1>Remember to close the file</h1>
+    <p>Close the file in your word processor and then click this close button..</p>
+    <p style="text-align:center; font-size: larger"><button id='close'>Close</button></p>
+    <div>Click <a href='javascript:openFile();'>here</a> to open it again</div>
+    { if ($repaired eq $local:file) then <div>This file has just been repaired</div> else 
+        if ($repaired eq "possibly-corrupt") then <div>Files created prior to Jan-6 2018 might be considered corrupt. If you see a warning, click this: <button id="repair">Repair</button> and then <a href='javascript:openFile();'>click here</a> to open it again.</div>
+        else ()
+    }
+
 </div>
+
 )
 }
 <div id="opener"></div>

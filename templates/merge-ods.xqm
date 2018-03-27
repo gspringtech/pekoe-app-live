@@ -290,6 +290,7 @@ declare function ods:placeholders-list($template) {
 };
 
 declare function ods:merge($intermediate, $template-bundle-path, $template-file-uri as xs:anyURI) {
+    let $log := util:log("warn","GENERATE ODS for " || $template-bundle-path) 
     let $template-content := $template-bundle-path || "/content.xml"
     let $merged := transform:transform($intermediate, $ods:merge-stylesheet, 
         <parameters>
@@ -297,5 +298,7 @@ declare function ods:merge($intermediate, $template-bundle-path, $template-file-
         </parameters>) 
     let $binary-form := util:string-to-binary(util:serialize($merged, "method=xml"))
     let $path-in-zip := 'content.xml' (: Which file in the odt are we replacing. :)
-    return if ($merged instance of element(error)) then $merged else zip:update($template-file-uri, $path-in-zip, $binary-form)
+    return if ($merged instance of element(error)) then $merged else 
+    odf-tools:replace-content(xs:anyURI('xmldb:exist://' || $template-file-uri), $binary-form ) 
+(:    zip:update($template-file-uri, $path-in-zip, $binary-form):)
 };

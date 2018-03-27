@@ -82,7 +82,6 @@ declare function templates:display-collections-list($collection as xs:string, $d
 };
 
 declare function templates:get-simple-listing($colName as xs:string, $defaults) as element()* {
-
     (templates:display-collections-list($colName,$defaults), templates:display-templates-list($colName,$defaults))
 };
 

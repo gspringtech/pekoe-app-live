@@ -28,7 +28,11 @@ html, body {margin:0; padding:5px;}
 </head>
 <body>
 <div style='width:900px'>
-    <h1>Pekoe Job Manager for {$local:tenant-info/string(name)}</h1> 
+    <h1>Pekoe Job Manager for {$local:tenant-info/string(name)}</h1>
+    <h3>Update - PekoeOfficeLink for Mac</h3>
+    <p>Mac users who use ODF files (OpenOffice Text or Spreadsheet) should <a href="/pekoe-common/PekoeOfficeLink.zip">download the PekoeOfficeLink app</a>. Install in your Applications folder, double-click, and choose your Office App.</p>
+    <p>You will also need to change your preferences in Firefox. In Preferences, scroll down to Applications, then type "neo" into the search box. Change the setting to "always ask" or else simply select the installed PekoeOfficeLink.</p>
+    <p>Once this is installed, you can upgrade NeoOffice or install LibreOffice.</p>
     <h2>Overview</h2>
     <p>The Pekoe Job Manager consists of this work area and your bookmarks.</p>
     <h2>Bookmarks</h2>

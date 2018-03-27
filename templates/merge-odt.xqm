@@ -268,16 +268,18 @@ zip:update($href as xs:anyURI, $paths as xs:string+, $binaries as xs:base64Binar
    - which could then pass it to a suitable output function
 :)
 declare function odt:merge($intermediate, $template-bundle-path, $template-file-uri as xs:anyURI) {
-
+    let $log := util:log("warn","GENERATE ODT for " || $template-bundle-path) 
     let $template-content := $template-bundle-path || "/content.xml"
     
     let $merged := transform:transform($intermediate, $odt:stylesheet, 
         <parameters>
             <param name="template-content">{attribute value {$template-content}}</param>
             </parameters>) 
-(:    let $binary-form := util:string-to-binary(util:serialize($merged, "method=xml")):)
+
     let $binary-form := util:string-to-binary(serialize($merged, <output:serialization-parameters><output:method value='xml'/><output:indent value='no'/></output:serialization-parameters>))
     let $path-in-zip := 'content.xml' (: Which file in the odt are we replacing. :)
 (:    WHY CAN'T I RUN A FOP - to PDF here? :)
-    return if ($merged instance of element(error)) then $merged else zip:update($template-file-uri, $path-in-zip, $binary-form)
+    return if ($merged instance of element(error)) then $merged else 
+    odf-tools:replace-content(xs:anyURI('xmldb:exist://' || $template-file-uri), $binary-form ) 
+(:    zip:update($template-file-uri, $path-in-zip, $binary-form):)
 };

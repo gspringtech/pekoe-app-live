@@ -171,7 +171,7 @@ declare function lw:xquery-search-btn($conf) {
                    data-href='{$conf?path-to-me}?{$path-params}'
                    data-title='' 
                    data-type='search'
-                   data-param='{substring-after($parts//fn:match,'$')}'><i class='glyphicon glyphicon-bookmark'/></span>
+                   data-param='{substring-after($parts//fn:match[1],'$')}'><i class='glyphicon glyphicon-bookmark'/></span>
             )
             else (
                (: This is a standard bookmark. :)

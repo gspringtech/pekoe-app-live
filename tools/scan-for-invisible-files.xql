@@ -52,6 +52,31 @@ declare function local:scan($tenant) {
     })
 };
 
-<invisible-files>{
-local:scan('cm')
+declare function local:scan-locked($tenant) {
+    let $tenant-path := $local:tenant-path-str || $tenant
+    return
+    dbutil:scan(xs:anyURI($tenant-path), function($col, $res) {
+       if ($res and ends-with($res, '.odt')) then 
+        let $r := xs:string($res)
+        let $d := util:document-name($r)
+        let $col := util:collection-name($r)
+        let $mime := xmldb:get-mime-type($res)
+        let $created := xmldb:created($col,$d)
+        let $locked := xmldb:document-has-lock($col,$d)
+        return try {
+           if ($locked) then 
+           let $unlocked := xmldb:clear-lock($col, $d)
+           return <r type='{$mime}' created='{$created}' u="{$unlocked}" >{$res}</r>
+           else () (:util:log('info','NOT LOCKED ' || $r):)
+       } catch *  { util:log('error', $err:description) }
+           
+        else ()
+    })
+};
+
+<scans>
+<clear-locked-files>{local:scan-locked('cm')}</clear-locked-files>
+<invisible-files>{ ()
+(:local:scan('cm'):)
 }</invisible-files>
+</scans>

@@ -27,6 +27,7 @@ import module namespace tenant = "http://pekoe.io/tenant" at "xmldb:exist:///db/
 import module namespace pqt="http://gspring.com.au/pekoe/querytools" at "xmldb:exist:///db/apps/pekoe/modules/querytools.xqm";
 import module namespace rp="http://pekoe.io/resource-permissions" at "xmldb:exist:///db/apps/pekoe/modules/resource-permissions.xqm";
 
+
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare option output:method "html5";
 declare option output:media-type "text/html";
@@ -152,6 +153,48 @@ declare function local:record-type($res) {
     
 :)
 
+declare function local:clean-file-name ($n) {
+    replace(tokenize($n,"\.")[1],"[\W]+","-")
+};
+
+declare function local:good-file-name($col, $n, $doctype) {
+(:    First, check to see if the name has been provided, and is available.
+    if so, return it.
+    If not available, or missing, create a name using the doctype and a datetime-stamp.
+    :)
+    if ($n ne '' and $n ne '.xml') 
+    then 
+        let $nn := local:clean-file-name($n) || ".xml"
+        let $not-available := doc-available($local:current-collection || '/' || $nn)
+        return if ($not-available) 
+            then ($doctype || format-dateTime(current-dateTime(),'-[Y0001][M01][D01]-[h01][m01]') || '.xml')
+            else $nn
+    else ($doctype || format-dateTime(current-dateTime(),'-[Y0001][M01][D01]-[h01][m01]') || '.xml')
+};
+
+declare function local:new-file() {
+(:   make a new file in the same location as this one. Check the filename and add an index if it exists. Return this file. 
+    It will need a copy of the first row.
+    :)
+    let $example := $local:items[1]
+    let $doc-type := $example/../name()
+    let $col := util:collection-name($local:selected-doc)
+    let $new-doc-name := local:good-file-name($col,request:get-parameter("new-file", ""), $doc-type)
+    let $new-item := element {$doc-type} { attribute tabular-data {"1"}, $example}
+    let $log:= util:log('warn','SAVING FILE TO ' || $new-doc-name || ' in collection ' || $col)
+    let $saved := xmldb:store($col,$new-doc-name, $new-item)
+    let $unlocked := rp:unlock-file($saved)
+    return
+(:    change to Tabular-data.xql?collection=/files/distribution/samples&file= $local:collection-path || "/" $new-doc-name :)
+    (
+        response:set-status-code(303), 
+(:        got https://pekoe.gspring.com.au/exist/pekoe-app/Tabular-data.xql?collection=/files/distribution/samples&file=samples-20171026-0932.xml
+        want  https://pekoe.gspring.com.au/exist/pekoe-app/Tabular-data.xql?collection=/files/distribution/samples&file=/exist/pekoe-files/files/distribution/samples/samples-20171026-0932.xml
+              https://pekoe.gspring.com.au/exist/pekoe-app/Tabular-data.xql?collection=/files/distribution/CDP&file=/exist/pekoe-files/files/distribution/CDP/cpd-2017-10.xml:)
+        response:set-header('Location', '/exist/pekoe-app/Tabular-data.xql?collection=' || tenant:local-path($col) || '&amp;file=/exist/pekoe-files/' || tenant:local-path($col) || '/' || $new-doc-name)
+        )
+};
+
 declare function local:new() {
     let $fields := map:new((map:entry('nodeid',''), for $f in $local:items[1]/* return  map:entry(name($f),'')))
     let $params := pqt:get-params($fields)
@@ -235,6 +278,7 @@ if (request:get-method() eq 'POST') then
         switch ($local:form-action)
             case 'update' return (local:update(), response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
             case 'new' return (local:new(), response:set-status-code(303), response:set-header('location', '?' || local:fix-params()))
+            case 'new-file' return local:new-file()
             case 'delete' return (local:delete(), response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
             default return (response:set-status-code(303), response:set-header('location', '?'|| request:get-query-string()))
         ) 
@@ -260,7 +304,7 @@ let $content :=  map:new(($default-content,  map {
     (: Row attributes will depend on whether this is a list of @tablular-data files, or one single file.   :)
     'row-attributes' : if ($local:selected-resource eq '') then local:attributes-for-files#2 else local:attributes-for-one-file#2 ,
     'fields' : if ($local:selected-resource eq '') then local:fields-for-files-list() else local:fields-for-one-file(),
-    'custom-row-parts' : if ($local:selected-resource ne '') then ['list-all', 'new-xxx' , 'search'] else ['list-all', 'text-search'],
+    'custom-row-parts' : if ($local:selected-resource ne '') then ['list-all', 'new-xxx' , 'search', 'new-file'] else ['list-all', 'text-search'],
     'custom-row' : map:new(($default-content?custom-row,  map {  
     'list-all'      : function ($conf) {
              
@@ -289,6 +333,16 @@ let $content :=  map:new(($default-content,  map {
                         <input  class='btn' type='submit' name='action' value='Search' />
                     </form>
                 </div>
+        },
+        'new-file' : function ($conf) {
+            <div class='btn-group'>
+                <form method='post' class='form-inline' action='/exist/pekoe-app/Tabular-data.xql'>
+                    <input type='hidden' name='collection' value='{$local:current-collection}'/>
+                    <input type='hidden' name='file' value='/exist/pekoe-files{tenant:local-path($local:selected-resource)}' />
+                    <input type='text' name='new-file' value='{$conf?new-file}' id="new-file" placeholder='New-File-name' class='form-control'/>
+                    <input  class='btn' type='submit' name='form-action' value='new-file' />
+                </form>
+            </div>
         }
     }))
     ,
